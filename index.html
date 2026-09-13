@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <title>Page Title</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        #startBtn {
+            font-size: 1.5rem;
+            padding: 0.75rem 1.5rem;
+            margin-top: 3rem;
+            cursor: pointer;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .panel {
+            background: #fff;
+            border-radius: 12px;
+            padding: 2rem;
+            min-width: 300px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .closeBtn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 1.2rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+
+        #question {
+            font-size: 1.5rem;
+            margin: 1rem 0 1.5rem;
+        }
+
+        .answers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+
+        .answers button {
+            font-size: 1.2rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+        }
+
+        .answers button.correct {
+            background: #8bd98b;
+        }
+
+        .answers button.wrong {
+            background: #e88a8a;
+        }
+
+        #progress {
+            font-size: 1rem;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        .success {
+            font-size: 1.5rem;
+            padding: 1rem 0;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script lang="javascript">
+        document.addEventListener("DOMContentLoaded", () => {
+            const startBtn = document.getElementById("startBtn");
+            const overlay = document.getElementById("overlay");
+            const closeBtn = document.getElementById("closeBtn");
+            const questionEl = document.getElementById("question");
+            const answersEl = document.getElementById("answers");
+            const progressEl = document.getElementById("progress");
+            const successEl = document.getElementById("success");
+            const quizEl = document.getElementById("quiz");
+            const requiredCorrect = 5;
+            let correctCount = 0;
+
+            function randomInt(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            function generateQuestion() {
+                const ops = ["+", "-", "*"];
+                const op = ops[randomInt(0, ops.length - 1)];
+                let a, b, answer;
+
+                if (op === "+") {
+                    a = randomInt(1, 20);
+                    b = randomInt(1, 20);
+                    answer = a + b;
+                } else if (op === "-") {
+                    a = randomInt(1, 20);
+                    b = randomInt(0, a);
+                    answer = a - b;
+                } else {
+                    a = randomInt(1, 10);
+                    b = randomInt(1, 10);
+                    answer = a * b;
+                }
+
+                const options = new Set([answer]);
+                while (options.size < 5) {
+                    const offset = randomInt(-10, 10);
+                    const wrong = answer + offset;
+                    if (wrong !== answer && wrong >= 0) {
+                        options.add(wrong);
+                    }
+                }
+
+                return {
+                    text: `${a} ${op} ${b} = ?`,
+                    answer,
+                    options: [...options].sort(() => Math.random() - 0.5)
+                };
+            }
+
+            function showQuestion() {
+                progressEl.textContent = `Correct: ${correctCount} / ${requiredCorrect}`;
+                const q = generateQuestion();
+                questionEl.textContent = q.text;
+                answersEl.innerHTML = "";
+
+                q.options.forEach(option => {
+                    const btn = document.createElement("button");
+                    btn.textContent = option;
+                    btn.addEventListener("click", () => {
+                        const buttons = answersEl.querySelectorAll("button");
+                        buttons.forEach(b => b.disabled = true);
+                        if (option === q.answer) {
+                            btn.classList.add("correct");
+                            correctCount++;
+                        } else {
+                            btn.classList.add("wrong");
+                            buttons.forEach(b => {
+                                if (Number(b.textContent) === q.answer) {
+                                    b.classList.add("correct");
+                                }
+                            });
+                        }
+
+                        if (correctCount >= requiredCorrect) {
+                            setTimeout(showSuccess, 1200);
+                        } else {
+                            setTimeout(showQuestion, 1200);
+                        }
+                    });
+                    answersEl.appendChild(btn);
+                });
+            }
+
+            function showSuccess() {
+                quizEl.classList.add("hidden");
+                successEl.classList.remove("hidden");
+            }
+
+            startBtn.addEventListener("click", () => {
+                correctCount = 0;
+                quizEl.classList.remove("hidden");
+                successEl.classList.add("hidden");
+                overlay.classList.remove("hidden");
+                showQuestion();
+            });
+
+            closeBtn.addEventListener("click", () => {
+                overlay.classList.add("hidden");
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Hello!</h1>
+    <button id="startBtn">Start</button>
+
+    <div id="overlay" class="overlay hidden">
+        <div class="panel">
+            <button id="closeBtn" class="closeBtn">✕</button>
+            <div id="quiz">
+                <div id="progress"></div>
+                <div id="question"></div>
+                <div id="answers" class="answers"></div>
+            </div>
+            <div id="success" class="success hidden">🎉 Great job! You got 5 correct! 🎉</div>
+        </div>
+    </div>
+</body>
+</html>
