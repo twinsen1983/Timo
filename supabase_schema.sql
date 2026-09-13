@@ -1,0 +1,184 @@
+create table if not exists public.profiles (
+    id uuid primary key references auth.users(id) on delete cascade,
+    username text unique not null,
+    coins integer not null default 0 check (coins >= 0),
+    character jsonb not null default jsonb_build_object(
+        'inventory', '[]'::jsonb,
+        'equipped', jsonb_build_object(
+            'shirt', '#4caf50',
+            'hair', '#4b2e1f',
+            'accessory', ''
+        )
+    ),
+    created_at timestamptz not null default now()
+);
+
+create table if not exists public.game_state (
+    id boolean primary key default true check (id),
+    announcement text not null default '',
+    multiplier integer not null default 1 check (multiplier in (1, 2, 4, 10, 20, 100)),
+    coin_event_active boolean not null default false,
+    poll jsonb,
+    updated_at timestamptz not null default now()
+);
+
+alter table public.game_state add column if not exists poll jsonb;
+
+insert into public.game_state (id)
+values (true)
+on conflict (id) do nothing;
+
+alter table public.profiles enable row level security;
+alter table public.game_state enable row level security;
+
+drop policy if exists "Profiles are readable by signed in users" on public.profiles;
+create policy "Profiles are readable by signed in users"
+on public.profiles for select
+to authenticated
+using (true);
+
+drop policy if exists "Users can create their own profile" on public.profiles;
+create policy "Users can create their own profile"
+on public.profiles for insert
+to authenticated
+with check (auth.uid() = id);
+
+drop policy if exists "Users can update their own profile" on public.profiles;
+create policy "Users can update their own profile"
+on public.profiles for update
+to authenticated
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+drop policy if exists "Signed in users can read game state" on public.game_state;
+create policy "Signed in users can read game state"
+on public.game_state for select
+to authenticated
+using (true);
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select exists (
+        select 1 from public.profiles
+        where id = auth.uid() and username = 'CyberTimo1234'
+    );
+$$;
+
+drop policy if exists "Admin can update game state" on public.game_state;
+create policy "Admin can update game state"
+on public.game_state for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create or replace function public.add_coins(target_user uuid, amount integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_admin() or amount < 1 then
+        raise exception 'Not allowed';
+    end if;
+
+    update public.profiles
+    set coins = coins + amount
+    where id = target_user;
+end;
+$$;
+
+grant execute on function public.add_coins(uuid, integer) to authenticated;
+
+create or replace function public.create_poll(poll_question text, poll_options text[])
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_admin() or length(trim(poll_question)) = 0 or cardinality(poll_options) < 2 then
+        raise exception 'Not allowed or invalid poll';
+    end if;
+
+    update public.game_state
+    set poll = jsonb_build_object(
+        'question', trim(poll_question),
+        'options', to_jsonb(poll_options),
+        'votes', to_jsonb(array_fill(0, array[cardinality(poll_options)])),
+        'voters', '[]'::jsonb
+    ),
+    updated_at = now()
+    where id = true;
+end;
+$$;
+
+create or replace function public.vote_poll(option_index integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    current_poll jsonb;
+    current_votes jsonb;
+    current_voters jsonb;
+    voter_id text := auth.uid()::text;
+    next_votes jsonb;
+begin
+    if auth.uid() is null then
+        raise exception 'You must be signed in';
+    end if;
+
+    select poll into current_poll from public.game_state where id = true for update;
+    if current_poll is null or option_index < 0 or option_index >= jsonb_array_length(current_poll -> 'options') then
+        raise exception 'Invalid poll option';
+    end if;
+
+    current_voters := coalesce(current_poll -> 'voters', '[]'::jsonb);
+    if current_voters ? voter_id then
+        raise exception 'You already voted';
+    end if;
+
+    current_votes := current_poll -> 'votes';
+    next_votes := jsonb_set(
+        current_votes,
+        array[option_index::text],
+        to_jsonb((current_votes ->> option_index)::integer + 1)
+    );
+
+    update public.game_state
+    set poll = jsonb_set(
+        jsonb_set(current_poll, '{votes}', next_votes),
+        '{voters}',
+        current_voters || jsonb_build_array(voter_id)
+    ),
+    updated_at = now()
+    where id = true;
+end;
+$$;
+
+grant execute on function public.create_poll(text, text[]) to authenticated;
+grant execute on function public.vote_poll(integer) to authenticated;
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    insert into public.profiles (id, username)
+    values (new.id, coalesce(new.raw_user_meta_data ->> 'username', split_part(new.email, '@', 1)));
+    return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute procedure public.handle_new_user();
