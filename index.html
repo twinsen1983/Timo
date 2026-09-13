@@ -3,11 +3,398 @@
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>Page Title</title>
+    <title>Home</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            background-color: lightblue;
+            margin: 0;
+            padding: 2rem 1rem;
+        }
+
+        .account-panel {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 0 auto 2rem;
+            max-width: 360px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .account-panel input {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            margin: 0.75rem 0;
+            padding: 0.7rem;
+            font-size: 1rem;
+        }
+
+        .account-panel button {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+        }
+
+        #authSwitch {
+            border: none;
+            background: none;
+            color: #1769aa;
+            text-decoration: underline;
+        }
+
+        #authMessage {
+            min-height: 1.25rem;
+            color: #b00020;
+        }
+
+        #accountInfo {
+            font-size: 1.1rem;
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 10;
+            margin: 0;
+            padding: 0.75rem 1rem;
+            max-width: none;
+            text-align: right;
+        }
+
+        .coin-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.35rem;
+        }
+
+        .coin-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.35rem;
+            height: 1.35rem;
+            border: 2px solid #c28b00;
+            border-radius: 50%;
+            background: #ffd34f;
+            color: #8a6200;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        #logoutBtn {
+            margin-left: 0.5rem;
+        }
+
+        #announcement {
+            background: #fff3b0;
+            border: 1px solid #d6b52f;
+            border-radius: 8px;
+            margin: 0 auto 1rem;
+            max-width: 600px;
+            padding: 0.75rem 1rem;
+        }
+
+        .admin-panel input,
+        .admin-panel select,
+        .admin-panel textarea {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            margin: 0.6rem 0;
+            padding: 0.6rem;
+            font: inherit;
+        }
+
+        .admin-panel textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .admin-panel button {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+        }
+
+        #adminClosePanelBtn {
+            margin-top: 1rem;
+            width: 100%;
+        }
+
+        .admin-message {
+            min-height: 1.25rem;
+            color: #1769aa;
+        }
+
+        .event-controls {
+            border-top: 1px solid #ddd;
+            margin-top: 1rem;
+            padding-top: 1rem;
+        }
+
+        .event-controls button,
+        .event-controls select {
+            margin: 0.35rem;
+            padding: 0.6rem;
+            cursor: pointer;
+        }
+
+        #coinRain {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .falling-coin {
+            position: absolute;
+            top: -3rem;
+            width: 2.6rem;
+            height: 2.6rem;
+            border: 3px solid #b57900;
+            border-radius: 50%;
+            background: #ffd34f;
+            color: #805900;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            pointer-events: auto;
+            animation: coin-fall 5s linear forwards;
+        }
+
+        @keyframes coin-fall {
+            to {
+                top: 105vh;
+                transform: rotate(360deg);
+            }
+        }
+
+        .page-nav {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            margin: 1.5rem auto;
+        }
+
+        .page-nav button {
+            border: 2px solid #1769aa;
+            border-radius: 8px;
+            background: #fff;
+            color: #1769aa;
+            padding: 0.7rem 1.2rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .page-nav button.active,
+        .page-nav button:hover {
+            background: #1769aa;
+            color: #fff;
+        }
+
+        .page-view {
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        #homeSection {
+            background: #fff;
+            border-radius: 12px;
+            padding: 2rem 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        #characterSection {
+            background: #fff;
+            border-radius: 12px;
+            margin: 2rem auto;
+            max-width: 620px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        #shopSection,
+        #clothesSection {
+            background: #fff;
+            border-radius: 12px;
+            margin: 2rem auto;
+            max-width: 620px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .owned-empty {
+            color: #555;
+        }
+
+        .character-preview {
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0 1.5rem;
+            perspective: 700px;
+        }
+
+        .avatar {
+            position: relative;
+            width: 190px;
+            height: 265px;
+            transform: rotateY(-12deg) rotateX(4deg);
+            transform-style: preserve-3d;
+            filter: drop-shadow(16px 16px 7px rgba(0, 0, 0, 0.25));
+        }
+
+        .avatar-face {
+            position: absolute;
+            top: 30px;
+            left: 53px;
+            width: 84px;
+            height: 76px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #ffe0bb 0 70%, #d99d70 70% 100%);
+            border: 3px solid #292929;
+            box-shadow: 8px 8px 0 #b87950;
+            z-index: 3;
+        }
+
+        .avatar-face::before,
+        .avatar-face::after {
+            content: "";
+            position: absolute;
+            top: 31px;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            background: #333;
+        }
+
+        .avatar-face::before {
+            left: 20px;
+        }
+
+        .avatar-face::after {
+            right: 20px;
+        }
+
+        .avatar-hair {
+            position: absolute;
+            top: 19px;
+            left: 58px;
+            width: 74px;
+            height: 28px;
+            border-radius: 8px 8px 2px 2px;
+            background: linear-gradient(135deg, var(--hair-color, #4b2e1f) 0 70%, #2b1a14 70% 100%);
+            border: 3px solid #292929;
+            box-shadow: 7px 6px 0 #241711;
+            z-index: 4;
+        }
+
+        .avatar-accessory {
+            position: absolute;
+            top: 1px;
+            left: 50%;
+            z-index: 5;
+            transform: translateX(-50%);
+            font-size: 2.2rem;
+        }
+
+        .avatar-accessory.crown {
+            top: -19px;
+            font-size: 2.4rem;
+        }
+
+        .avatar-accessory.glasses {
+            top: 51px;
+            font-size: 1.65rem;
+        }
+
+        .avatar-torso,
+        .avatar-arm,
+        .avatar-leg {
+            position: absolute;
+            border: 3px solid #292929;
+            box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.25);
+        }
+
+        .avatar-torso {
+            top: 112px;
+            left: 45px;
+            width: 100px;
+            height: 72px;
+            background: linear-gradient(135deg, var(--shirt-color, #4caf50) 0 70%, #247331 70% 100%);
+            z-index: 2;
+        }
+
+        .avatar-arm {
+            top: 114px;
+            width: 28px;
+            height: 68px;
+            background: linear-gradient(135deg, var(--shirt-color, #4caf50) 0 70%, #247331 70% 100%);
+            z-index: 1;
+        }
+
+        .avatar-arm.left {
+            left: 10px;
+        }
+
+        .avatar-arm.right {
+            right: 10px;
+        }
+
+        .avatar-leg {
+            top: 184px;
+            width: 43px;
+            height: 68px;
+            background: linear-gradient(135deg, #34495e 0 70%, #1f2e3b 70% 100%);
+            z-index: 1;
+        }
+
+        .avatar-leg.left {
+            left: 48px;
+        }
+
+        .avatar-leg.right {
+            right: 48px;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .shop-item {
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            background: #f7f7f7;
+            padding: 0.75rem;
+        }
+
+        .shop-item-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 54px;
+            height: 54px;
+            margin: 0 auto 0.5rem;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #ddd;
+            font-size: 1.8rem;
+        }
+
+        .shop-item-preview.shirt,
+        .shop-item-preview.hair {
+            border-radius: 50%;
+        }
+
+        .shop-item button {
+            cursor: pointer;
+            padding: 0.45rem 0.7rem;
+        }
+
+        .shop-item button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
         }
 
         #startBtn {
@@ -15,6 +402,11 @@
             padding: 0.75rem 1.5rem;
             margin-top: 3rem;
             cursor: pointer;
+        }
+
+        #startBtn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
         }
 
         .overlay {
@@ -89,9 +481,52 @@
             display: none;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script lang="javascript">
         document.addEventListener("DOMContentLoaded", () => {
+            const supabaseUrl = "https://byiurbihafbaefffmbpq.supabase.co";
+            const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5aXVyYmloYWZiYWVmZmZtYnBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMDEzODAsImV4cCI6MjEwNDg3NzM4MH0.K5hcAQxxOHV6NPuK--yQ_N0unc5WrpkpyiuQDxDDA5Y";
+            const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
             const startBtn = document.getElementById("startBtn");
+            const authPanel = document.getElementById("authPanel");
+            const accountInfo = document.getElementById("accountInfo");
+            const authTitle = document.getElementById("authTitle");
+            const authForm = document.getElementById("authForm");
+            const usernameInput = document.getElementById("username");
+            const passwordInput = document.getElementById("password");
+            const authSubmit = document.getElementById("authSubmit");
+            const authSwitch = document.getElementById("authSwitch");
+            const authMessage = document.getElementById("authMessage");
+            const welcomeEl = document.getElementById("welcome");
+            const coinCountEl = document.getElementById("coinCount");
+            const logoutBtn = document.getElementById("logoutBtn");
+            const adminOpenBtn = document.getElementById("adminOpenBtn");
+            const announcementEl = document.getElementById("announcement");
+            const adminOverlay = document.getElementById("adminOverlay");
+            const adminCloseBtn = document.getElementById("adminCloseBtn");
+            const coinForm = document.getElementById("coinForm");
+            const coinUserSelect = document.getElementById("coinUser");
+            const coinAmountInput = document.getElementById("coinAmount");
+            const announcementForm = document.getElementById("announcementForm");
+            const announcementInput = document.getElementById("announcementInput");
+            const adminMessage = document.getElementById("adminMessage");
+            const adminClosePanelBtn = document.getElementById("adminClosePanelBtn");
+            const startCoinEventBtn = document.getElementById("startCoinEventBtn");
+            const stopCoinEventBtn = document.getElementById("stopCoinEventBtn");
+            const multiplierSelect = document.getElementById("multiplierSelect");
+            const setMultiplierBtn = document.getElementById("setMultiplierBtn");
+            const multiplierStatus = document.getElementById("multiplierStatus");
+            const coinRain = document.getElementById("coinRain");
+            const characterSection = document.getElementById("characterSection");
+            const homeSection = document.getElementById("homeSection");
+            const shopSection = document.getElementById("shopSection");
+            const clothesSection = document.getElementById("clothesSection");
+            const avatarEl = document.getElementById("avatar");
+            const shopGrid = document.getElementById("shopGrid");
+            const clothesGrid = document.getElementById("clothesGrid");
+            const shopMessage = document.getElementById("shopMessage");
+            const removeAccessoryBtn = document.getElementById("removeAccessoryBtn");
+            const navButtons = document.querySelectorAll(".page-nav button");
             const overlay = document.getElementById("overlay");
             const closeBtn = document.getElementById("closeBtn");
             const questionEl = document.getElementById("question");
@@ -101,6 +536,511 @@
             const quizEl = document.getElementById("quiz");
             const requiredCorrect = 5;
             let correctCount = 0;
+            let authMode = "login";
+            let currentUsername = null;
+            let currentProfile = null;
+            let coinRainActive = false;
+            let currentView = "home";
+            const shopItems = [
+                { id: "blue-shirt", name: "Blue shirt", price: 5, type: "shirt", value: "#3b82f6" },
+                { id: "red-shirt", name: "Red shirt", price: 8, type: "shirt", value: "#ef4444" },
+                { id: "gold-hair", name: "Gold hair", price: 10, type: "hair", value: "#eab308" },
+                { id: "crown", name: "Crown", price: 20, type: "accessory", value: "👑" },
+                { id: "brown-hair", name: "Brown hair", price: 0, type: "hair", value: "#5e0000" },
+            ];
+
+            function getUsers() {
+                return JSON.parse(localStorage.getItem("mathQuizUsers") || "{}");
+            }
+
+            function saveUsers(users) {
+                localStorage.setItem("mathQuizUsers", JSON.stringify(users));
+            }
+
+            async function loadRemoteProfile() {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) {
+                    currentUsername = null;
+                    currentProfile = null;
+                    return;
+                }
+
+                const { data: profile } = await supabaseClient
+                    .from("profiles")
+                    .select("id, username, coins, character, role")
+                    .eq("id", user.id)
+                    .single();
+                currentProfile = profile;
+                currentUsername = profile ? profile.username : null;
+            }
+
+            async function loadGameEvent() {
+                const { data } = await supabaseClient
+                    .from("game_events")
+                    .select("coin_rain_active, multiplier")
+                    .eq("id", true)
+                    .single();
+                if (data) {
+                    coinRainActive = data.coin_rain_active;
+                    multiplierSelect.value = String(data.multiplier);
+                    multiplierStatus.textContent = `Current exercise reward: ${data.multiplier}x coins`;
+                }
+            }
+
+            async function addCoins(amount) {
+                if (!currentProfile) {
+                    return;
+                }
+                const { error } = await supabaseClient.rpc("claim_coin_rain");
+                if (error) {
+                    return;
+                }
+                await loadRemoteProfile();
+                updateAccountView();
+            }
+
+            function spawnCoin() {
+                if (!coinRainActive) {
+                    return;
+                }
+
+                const coin = document.createElement("button");
+                coin.className = "falling-coin";
+                coin.type = "button";
+                coin.textContent = "+5";
+                coin.style.left = `${Math.random() * 94}vw`;
+                coin.addEventListener("click", async () => {
+                    if (coinRainActive) {
+                        await addCoins(5);
+                        coin.remove();
+                    }
+                });
+                coin.addEventListener("animationend", () => coin.remove());
+                coinRain.appendChild(coin);
+            }
+
+            async function startCoinEvent() {
+                await supabaseClient.rpc("set_game_event", {
+                    coin_rain: true,
+                    new_multiplier: currentProfile ? await getRemoteMultiplier() : 1
+                });
+                coinRainActive = true;
+                adminMessage.textContent = "Coin rain event gestart.";
+                spawnCoin();
+            }
+
+            async function stopCoinEvent() {
+                await supabaseClient.rpc("set_game_event", {
+                    coin_rain: false,
+                    new_multiplier: await getRemoteMultiplier()
+                });
+                coinRainActive = false;
+                coinRain.innerHTML = "";
+                adminMessage.textContent = "Coin rain event gestopt.";
+            }
+
+            async function getRemoteMultiplier() {
+                const { data } = await supabaseClient
+                    .from("game_events")
+                    .select("multiplier")
+                    .eq("id", true)
+                    .single();
+                return data ? data.multiplier : 1;
+            }
+
+            function ensureCharacter(user) {
+                if (!user.character) {
+                    user.character = {
+                        inventory: [],
+                        equipped: {
+                            shirt: "#4caf50",
+                            hair: "#4b2e1f",
+                            accessory: ""
+                        }
+                    };
+                }
+                if (!user.character.inventory) {
+                    user.character.inventory = [];
+                }
+                if (!user.character.equipped) {
+                    user.character.equipped = {
+                        shirt: "#4caf50",
+                        hair: "#4b2e1f",
+                        accessory: ""
+                    };
+                }
+                return user.character;
+            }
+
+            function updateCharacterView() {
+                const users = getUsers();
+                const user = currentUsername ? users[currentUsername] : null;
+                const isLoggedIn = Boolean(user);
+
+                if (!isLoggedIn) {
+                    characterSection.classList.add("hidden");
+                    shopSection.classList.add("hidden");
+                    clothesSection.classList.add("hidden");
+                    return;
+                }
+
+                const character = ensureCharacter(user);
+                avatarEl.style.setProperty("--shirt-color", character.equipped.shirt);
+                avatarEl.style.setProperty("--hair-color", character.equipped.hair);
+                const accessoryEl = avatarEl.querySelector(".avatar-accessory");
+                accessoryEl.textContent = character.equipped.accessory;
+                accessoryEl.className = "avatar-accessory";
+                if (character.equipped.accessory === "👑") {
+                    accessoryEl.classList.add("crown");
+                } else if (character.equipped.accessory === "🕶️") {
+                    accessoryEl.classList.add("glasses");
+                }
+                shopGrid.innerHTML = "";
+                clothesGrid.innerHTML = "";
+
+                shopItems.forEach(item => {
+                    const itemEl = document.createElement("div");
+                    itemEl.className = "shop-item";
+                    const preview = document.createElement("div");
+                    preview.className = `shop-item-preview ${item.type}`;
+                    preview.textContent = item.type === "accessory" ? item.value : "";
+                    if (item.type !== "accessory") {
+                        preview.style.backgroundColor = item.value;
+                    }
+                    const owned = character.inventory.includes(item.id);
+                    const equipped = character.equipped[item.type] === item.value;
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.disabled = equipped || (!owned && user.coins < item.price);
+                    button.textContent = equipped ? "Equipped" : (owned ? "Use" : `${item.price} coins`);
+                    button.addEventListener("click", () => owned ? equipItem(item) : buyItem(item));
+                    itemEl.appendChild(preview);
+                    const itemName = document.createElement("strong");
+                    itemName.textContent = item.name;
+                    itemEl.appendChild(itemName);
+                    itemEl.appendChild(document.createElement("br"));
+                    itemEl.appendChild(button);
+                    shopGrid.appendChild(itemEl);
+                });
+
+                const ownedItems = shopItems.filter(item => character.inventory.includes(item.id));
+                if (ownedItems.length === 0) {
+                    clothesGrid.innerHTML = '<p class="owned-empty">You do not own any clothes yet. Buy something in the shop.</p>';
+                } else {
+                    ownedItems.forEach(item => {
+                        const itemEl = document.createElement("div");
+                        itemEl.className = "shop-item";
+                        const preview = document.createElement("div");
+                        preview.className = `shop-item-preview ${item.type}`;
+                        preview.textContent = item.type === "accessory" ? item.value : "";
+                        if (item.type !== "accessory") {
+                            preview.style.backgroundColor = item.value;
+                        }
+                        const equipped = character.equipped[item.type] === item.value;
+                        const button = document.createElement("button");
+                        button.type = "button";
+                        button.textContent = equipped ? "Unequip" : "Equip";
+                        button.addEventListener("click", () => equipped ? unequipItem(item) : equipItem(item));
+                        itemEl.appendChild(preview);
+                        const itemName = document.createElement("strong");
+                        itemName.textContent = item.name;
+                        itemEl.appendChild(itemName);
+                        itemEl.appendChild(document.createElement("br"));
+                        itemEl.appendChild(button);
+                        clothesGrid.appendChild(itemEl);
+                    });
+                }
+
+                saveUsers(users);
+            }
+
+            function buyItem(item) {
+                const users = getUsers();
+                const user = users[currentUsername];
+                const character = user ? ensureCharacter(user) : null;
+
+                if (!user || character.inventory.includes(item.id)) {
+                    return;
+                }
+                if (user.coins < item.price) {
+                    shopMessage.textContent = "Je hebt niet genoeg coins.";
+                    return;
+                }
+
+                user.coins -= item.price;
+                character.inventory.push(item.id);
+                character.equipped[item.type] = item.value;
+                saveUsers(users);
+                shopMessage.textContent = `${item.name} gekocht en uitgerust.`;
+                updateAccountView();
+                updateCharacterView();
+            }
+
+            function equipItem(item) {
+                const users = getUsers();
+                const user = users[currentUsername];
+                const character = user ? ensureCharacter(user) : null;
+
+                if (!user || !character.inventory.includes(item.id)) {
+                    return;
+                }
+
+                character.equipped[item.type] = item.value;
+                saveUsers(users);
+                shopMessage.textContent = `${item.name} uitgerust.`;
+                updateCharacterView();
+            }
+
+            function unequipItem(item) {
+                const users = getUsers();
+                const user = users[currentUsername];
+                const character = user ? ensureCharacter(user) : null;
+                const defaultValues = {
+                    shirt: "#4caf50",
+                    hair: "#4b2e1f",
+                    accessory: ""
+                };
+
+                if (!user || character.equipped[item.type] !== item.value) {
+                    return;
+                }
+
+                character.equipped[item.type] = defaultValues[item.type];
+                saveUsers(users);
+                shopMessage.textContent = `${item.name} unequipped.`;
+                updateCharacterView();
+            }
+
+            removeAccessoryBtn.addEventListener("click", () => {
+                const users = getUsers();
+                const user = users[currentUsername];
+                const character = user ? ensureCharacter(user) : null;
+
+                if (!user || !character.equipped.accessory) {
+                    shopMessage.textContent = "Er is geen accessoire uitgerust.";
+                    return;
+                }
+
+                character.equipped.accessory = "";
+                saveUsers(users);
+                shopMessage.textContent = "Accessoire verwijderd.";
+                updateCharacterView();
+            });
+
+            navButtons.forEach(button => {
+                button.addEventListener("click", () => {
+                    currentView = button.dataset.view;
+                    navButtons.forEach(navButton => navButton.classList.toggle("active", navButton === button));
+                    homeSection.classList.toggle("hidden", currentView !== "home");
+                    shopSection.classList.toggle("hidden", currentView !== "shop");
+                    characterSection.classList.toggle("hidden", currentView !== "clothes");
+                    clothesSection.classList.toggle("hidden", currentView !== "clothes");
+                });
+            });
+
+            function isAdmin() {
+                return currentProfile && currentProfile.role === "admin";
+            }
+
+            async function showAnnouncement() {
+                const { data } = await supabaseClient
+                    .from("announcements")
+                    .select("message")
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                const announcement = data ? data.message : "";
+                announcementEl.textContent = announcement;
+                announcementEl.classList.toggle("hidden", !announcement);
+            }
+
+            async function updateCoinUsers() {
+                const { data: users } = await supabaseClient
+                    .from("profiles")
+                    .select("username")
+                    .order("username");
+                coinUserSelect.innerHTML = "";
+                (users || []).forEach(user => {
+                    const option = document.createElement("option");
+                    option.value = user.username;
+                    option.textContent = user.username;
+                    coinUserSelect.appendChild(option);
+                });
+            }
+
+            async function openAdminPanel() {
+                if (!isAdmin()) {
+                    return;
+                }
+                await updateCoinUsers();
+                adminMessage.textContent = "";
+                adminOverlay.classList.remove("hidden");
+            }
+
+            function updateAccountView() {
+                const users = getUsers();
+                const user = currentProfile || (currentUsername ? users[currentUsername] : null);
+                const isLoggedIn = Boolean(user);
+
+                authPanel.classList.toggle("hidden", isLoggedIn);
+                accountInfo.classList.toggle("hidden", !isLoggedIn);
+                startBtn.disabled = !isLoggedIn;
+                adminOpenBtn.classList.toggle("hidden", !isAdmin());
+
+                if (isLoggedIn) {
+                    welcomeEl.textContent = `Ingelogd als ${currentUsername}`;
+                    coinCountEl.textContent = user.coins;
+                }
+                updateCharacterView();
+            }
+
+            function setAuthMode(mode) {
+                authMode = mode;
+                const isRegistering = mode === "register";
+                authTitle.textContent = isRegistering ? "Registreren" : "Inloggen";
+                authSubmit.textContent = isRegistering ? "Registreren" : "Inloggen";
+                authSwitch.textContent = isRegistering
+                    ? "Heb je al een account? Inloggen"
+                    : "Nog geen account? Registreren";
+                authMessage.textContent = "";
+            }
+
+            authForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                const email = `${username.toLowerCase().replace(/[^a-z0-9]/g, "_")}@timo.local`;
+
+                if (username.length < 2 || password.length < 4) {
+                    authMessage.textContent = "Gebruik minstens 2 tekens voor je gebruikersnaam en 4 voor je wachtwoord.";
+                    return;
+                }
+
+                let result;
+                if (authMode === "register") {
+                    result = await supabaseClient.auth.signUp({
+                        email,
+                        password,
+                        options: { data: { username } }
+                    });
+                } else {
+                    result = await supabaseClient.auth.signInWithPassword({ email, password });
+                }
+
+                if (result.error) {
+                    authMessage.textContent = result.error.message;
+                    return;
+                }
+
+                authForm.reset();
+                await loadRemoteProfile();
+                updateAccountView();
+                showAnnouncement();
+                shopMessage.textContent = "";
+            });
+
+            authSwitch.addEventListener("click", () => {
+                setAuthMode(authMode === "login" ? "register" : "login");
+            });
+
+            logoutBtn.addEventListener("click", async () => {
+                await supabaseClient.auth.signOut();
+                currentUsername = null;
+                currentProfile = null;
+                updateAccountView();
+            });
+
+            adminOpenBtn.addEventListener("click", openAdminPanel);
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "F2") {
+                    event.preventDefault();
+                    if (!isAdmin()) {
+                        return;
+                    }
+                    if (adminOverlay.classList.contains("hidden")) {
+                        openAdminPanel();
+                    } else {
+                        adminOverlay.classList.add("hidden");
+                    }
+                }
+            });
+
+            coinForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const username = coinUserSelect.value;
+                const amount = Number(coinAmountInput.value);
+
+                if (!isAdmin() || !Number.isInteger(amount) || amount < 1) {
+                    adminMessage.textContent = "Kies een gebruiker en een geldig aantal coins.";
+                    return;
+                }
+
+                const { data: target } = await supabaseClient
+                    .from("profiles")
+                    .select("id")
+                    .eq("username", username)
+                    .single();
+                const { error } = target
+                    ? await supabaseClient.rpc("add_coins", { target_user: target.id, amount })
+                    : { error: new Error("User not found") };
+                if (error) {
+                    adminMessage.textContent = error.message;
+                    return;
+                }
+                updateAccountView();
+                adminMessage.textContent = `${amount} coin(s) gegeven aan ${username}.`;
+                coinAmountInput.value = "1";
+            });
+
+            startCoinEventBtn.addEventListener("click", startCoinEvent);
+            stopCoinEventBtn.addEventListener("click", stopCoinEvent);
+
+            setMultiplierBtn.addEventListener("click", async () => {
+                if (!isAdmin()) {
+                    return;
+                }
+                const { error } = await supabaseClient.rpc("set_game_event", {
+                    coin_rain: coinRainActive,
+                    new_multiplier: Number(multiplierSelect.value)
+                });
+                if (error) {
+                    adminMessage.textContent = error.message;
+                    return;
+                }
+                await loadGameEvent();
+                adminMessage.textContent = `Oefeningen geven nu ${multiplierSelect.value}x coins.`;
+            });
+
+            announcementForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const announcement = announcementInput.value.trim();
+
+                if (!isAdmin() || !announcement) {
+                    adminMessage.textContent = "Vul een aankondiging in.";
+                    return;
+                }
+
+                const { error } = await supabaseClient.from("announcements").insert({
+                    message: announcement,
+                    created_by: (await supabaseClient.auth.getUser()).data.user.id
+                });
+                if (error) {
+                    adminMessage.textContent = error.message;
+                    return;
+                }
+                await showAnnouncement();
+                announcementForm.reset();
+                adminMessage.textContent = "Aankondiging geplaatst.";
+            });
+
+            adminCloseBtn.addEventListener("click", () => {
+                adminOverlay.classList.add("hidden");
+            });
+
+            adminClosePanelBtn.addEventListener("click", () => {
+                adminOverlay.classList.add("hidden");
+            });
 
             function randomInt(min, max) {
                 return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -150,12 +1090,17 @@
                 q.options.forEach(option => {
                     const btn = document.createElement("button");
                     btn.textContent = option;
-                    btn.addEventListener("click", () => {
+                    btn.addEventListener("click", async () => {
                         const buttons = answersEl.querySelectorAll("button");
                         buttons.forEach(b => b.disabled = true);
                         if (option === q.answer) {
                             btn.classList.add("correct");
                             correctCount++;
+                            const { error } = await supabaseClient.rpc("claim_correct_answer");
+                            if (!error) {
+                                await loadRemoteProfile();
+                                updateAccountView();
+                            }
                         } else {
                             btn.classList.add("wrong");
                             buttons.forEach(b => {
@@ -191,12 +1136,96 @@
             closeBtn.addEventListener("click", () => {
                 overlay.classList.add("hidden");
             });
+
+            window.addEventListener("storage", async () => {
+                await loadGameEvent();
+                if (!coinRainActive) {
+                    coinRain.innerHTML = "";
+                }
+            });
+
+            loadGameEvent();
+            setInterval(spawnCoin, 700);
+
+            supabaseClient
+                .channel("global-game-updates")
+                .on("postgres_changes", { event: "*", schema: "public", table: "game_events" }, loadGameEvent)
+                .on("postgres_changes", { event: "INSERT", schema: "public", table: "announcements" }, showAnnouncement)
+                .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, async payload => {
+                    if (currentProfile && payload.new.id === currentProfile.id) {
+                        await loadRemoteProfile();
+                        updateAccountView();
+                    }
+                })
+                .subscribe();
+
+            loadRemoteProfile().then(() => {
+                updateAccountView();
+                showAnnouncement();
+            });
         });
     </script>
 </head>
 <body>
     <h1>Hello!</h1>
-    <button id="startBtn">Start</button>
+    <div id="announcement" class="hidden" role="status"></div>
+    <section id="authPanel" class="account-panel">
+        <h2 id="authTitle">Inloggen</h2>
+        <form id="authForm">
+            <input id="username" type="text" placeholder="Gebruikersnaam" autocomplete="username" required>
+            <input id="password" type="password" placeholder="Wachtwoord" autocomplete="current-password" required>
+            <button id="authSubmit" type="submit">Inloggen</button>
+        </form>
+        <p id="authMessage"></p>
+        <button id="authSwitch" type="button">Nog geen account? Registreren</button>
+    </section>
+    <section id="accountInfo" class="account-panel hidden">
+        <div id="welcome"></div>
+        <div class="coin-display" aria-label="Aantal coins">
+            <span class="coin-icon" aria-hidden="true">C</span>
+            <strong id="coinCount">0</strong>
+        </div>
+        <button id="logoutBtn" type="button">Uitloggen</button>
+        <button id="adminOpenBtn" class="hidden" type="button">Open admin panel</button>
+    </section>
+    <nav class="page-nav" aria-label="Main navigation">
+        <button type="button" data-view="home" class="active">Home</button>
+        <button type="button" data-view="shop">Shop</button>
+        <button type="button" data-view="clothes">Clothes</button>
+    </nav>
+    <section id="homeSection" class="page-view">
+        <h2>Home</h2>
+        <p>Complete exercises to earn coins and customize your character.</p>
+        <button id="startBtn">Start exercises</button>
+    </section>
+    <section id="characterSection" class="hidden">
+        <h2>Your character</h2>
+        <div class="character-preview">
+            <div id="avatar" class="avatar" aria-label="Your character">
+                <div class="avatar-hair"></div>
+                <div class="avatar-face"></div>
+                <div class="avatar-accessory"></div>
+                <div class="avatar-torso"></div>
+                <div class="avatar-arm left"></div>
+                <div class="avatar-arm right"></div>
+                <div class="avatar-leg left"></div>
+                <div class="avatar-leg right"></div>
+            </div>
+        </div>
+    </section>
+    <section id="shopSection" class="page-view hidden">
+        <h2>Shop</h2>
+        <p>Buy items with coins from the exercises.</p>
+        <div id="shopGrid" class="shop-grid"></div>
+        <p id="shopMessage" class="admin-message"></p>
+    </section>
+    <section id="clothesSection" class="page-view hidden">
+        <h2>Clothes</h2>
+        <p>Equip items you have bought.</p>
+        <div id="clothesGrid" class="shop-grid"></div>
+        <button id="removeAccessoryBtn" type="button">Remove accessory</button>
+        <p id="clothesMessage" class="admin-message"></p>
+    </section>
 
     <div id="overlay" class="overlay hidden">
         <div class="panel">
@@ -209,5 +1238,42 @@
             <div id="success" class="success hidden">🎉 Great job! You got 5 correct! 🎉</div>
         </div>
     </div>
+
+    <div id="adminOverlay" class="overlay hidden">
+        <div class="panel admin-panel">
+            <button id="adminCloseBtn" class="closeBtn" type="button">✕</button>
+            <h2>Admin panel</h2>
+            <form id="coinForm">
+                <h3>Coins geven</h3>
+                <select id="coinUser" required></select>
+                <input id="coinAmount" type="number" min="1" step="1" value="1" required>
+                <button type="submit">Geef coins</button>
+            </form>
+            <form id="announcementForm">
+                <h3>Global announcement</h3>
+                <textarea id="announcementInput" placeholder="Typ een aankondiging..." required></textarea>
+                <button type="submit">Plaats aankondiging</button>
+            </form>
+            <div class="event-controls">
+                <h3>Events</h3>
+                <button id="startCoinEventBtn" type="button">Start coin rain (+5)</button>
+                <button id="stopCoinEventBtn" type="button">Stop coin rain</button>
+                <br>
+                <select id="multiplierSelect">
+                    <option value="1">1x coins</option>
+                    <option value="2">2x coins</option>
+                    <option value="4">4x coins</option>
+                    <option value="10">10x coins</option>
+                    <option value="20">20x coins</option>
+                    <option value="100">100x coins</option>
+                </select>
+                <button id="setMultiplierBtn" type="button">Set multiplier</button>
+                <p id="multiplierStatus" class="admin-message"></p>
+            </div>
+            <p id="adminMessage" class="admin-message"></p>
+            <button id="adminClosePanelBtn" type="button">Close admin panel</button>
+        </div>
+    </div>
+    <div id="coinRain" aria-live="polite"></div>
 </body>
 </html>
