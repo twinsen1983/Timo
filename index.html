@@ -140,6 +140,14 @@
             cursor: pointer;
         }
 
+        .admin-panel {
+            box-sizing: border-box;
+            width: min(620px, calc(100vw - 2rem));
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
         #adminClosePanelBtn {
             margin-top: 1rem;
             width: 100%;
@@ -610,13 +618,27 @@
                     return null;
                 }
 
-                const { data: profile, error } = await supabaseClient
+                const { data: existingProfile, error } = await supabaseClient
                     .from("profiles")
                     .select("id, username, coins, character")
                     .eq("id", user.id)
-                    .single();
+                    .maybeSingle();
                 if (error) {
                     throw error;
+                }
+
+                let profile = existingProfile;
+                if (!profile) {
+                    const username = user.user_metadata?.username || user.email.split("@")[0];
+                    const { data: createdProfile, error: createError } = await supabaseClient
+                        .from("profiles")
+                        .insert({ id: user.id, username })
+                        .select("id, username, coins, character")
+                        .single();
+                    if (createError) {
+                        throw createError;
+                    }
+                    profile = createdProfile;
                 }
 
                 const users = getUsers();
@@ -1030,7 +1052,8 @@
                     showAnnouncement();
                     shopMessage.textContent = "";
                 } catch (error) {
-                    authMessage.textContent = "Profiel laden mislukt. Voer eerst supabase_schema.sql uit.";
+                    console.error("Supabase profile error:", error);
+                    authMessage.textContent = `Profiel laden mislukt: ${error.message || "onbekende fout"}`;
                 }
             });
 
@@ -1266,7 +1289,8 @@
                     try {
                         await loadRemoteProfile();
                     } catch (error) {
-                        authMessage.textContent = "Voer eerst supabase_schema.sql uit in Supabase.";
+                        console.error("Supabase session error:", error);
+                        authMessage.textContent = `Supabase-profiel laden mislukt: ${error.message || "onbekende fout"}`;
                     }
                 } else {
                     currentUsername = null;
