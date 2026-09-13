@@ -928,7 +928,19 @@
                 }
 
                 if (result.error) {
-                    authMessage.textContent = result.error.message;
+                    const message = result.error.message.toLowerCase();
+                    if (message.includes("email not confirmed")) {
+                        authMessage.textContent = "Zet 'Confirm email' uit in Supabase bij Authentication > Providers > Email en probeer opnieuw.";
+                    } else if (message.includes("invalid login credentials")) {
+                        authMessage.textContent = "Gebruikersnaam of wachtwoord is niet juist. Oude Gmail-accounts werken niet met deze login; registreer opnieuw zonder Gmail.";
+                    } else {
+                        authMessage.textContent = result.error.message;
+                    }
+                    return;
+                }
+
+                if (authMode === "register" && !result.data.session) {
+                    authMessage.textContent = "Account gemaakt. Zet 'Confirm email' uit in Supabase om direct in te loggen.";
                     return;
                 }
 
