@@ -463,6 +463,39 @@
             cursor: crosshair;
         }
 
+        .pvp-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 3.5rem);
+            justify-content: center;
+            gap: 0.4rem;
+            margin: 0.75rem auto;
+        }
+
+        .pvp-controls button {
+            min-height: 3.5rem;
+            border: 2px solid #1769aa;
+            border-radius: 8px;
+            background: #fff;
+            color: #1769aa;
+            font-size: 1.3rem;
+            font-weight: bold;
+            touch-action: manipulation;
+        }
+
+        .pvp-controls button:active,
+        #pvpShootBtn:active {
+            background: #1769aa;
+            color: #fff;
+        }
+
+        #pvpShootBtn {
+            grid-column: 1 / -1;
+            background: #e53935;
+            border-color: #b71c1c;
+            color: #fff;
+            cursor: pointer;
+        }
+
         #gameMessage {
             min-height: 1.5rem;
             color: #1769aa;
@@ -818,6 +851,8 @@
             const roomAnswersEl = document.getElementById("roomAnswers");
             const pvpCanvas = document.getElementById("pvpCanvas");
             const pvpContext = pvpCanvas.getContext("2d");
+            const pvpShootBtn = document.getElementById("pvpShootBtn");
+            const pvpControlButtons = document.querySelectorAll("[data-pvp-direction]");
             const gameMessage = document.getElementById("gameMessage");
             const avatarEl = document.getElementById("avatar");
             const shopGrid = document.getElementById("shopGrid");
@@ -1320,13 +1355,33 @@
                 ["host", "guest"].forEach(key => {
                     const player = state[key];
                     if (!player) return;
-                    pvpContext.fillStyle = key === "host" ? "#2196f3" : "#e53935";
-                    pvpContext.fillRect(player.x - 18, player.y - 18, 36, 36);
-                    pvpContext.fillStyle = "#222";
-                    pvpContext.fillRect(player.x - 18, player.y - 28, 36, 5);
+                    drawArenaAvatar(player, key === "host" ? "#2196f3" : "#e53935");
                     pvpContext.fillStyle = "#5cff5c";
-                    pvpContext.fillRect(player.x - 18, player.y - 28, 36 * (player.hp / 100), 5);
+                    pvpContext.fillRect(player.x - 28, player.y - 48, 56 * (player.hp / 100), 5);
                 });
+            }
+
+            function drawArenaAvatar(player, shirtColor) {
+                const x = player.x;
+                const y = player.y;
+                pvpContext.fillStyle = "#292929";
+                pvpContext.fillRect(x - 14, y - 38, 28, 28);
+                pvpContext.fillStyle = "#ffd0a6";
+                pvpContext.fillRect(x - 11, y - 35, 22, 22);
+                pvpContext.fillStyle = "#4b2e1f";
+                pvpContext.fillRect(x - 13, y - 41, 26, 8);
+                pvpContext.fillStyle = shirtColor;
+                pvpContext.fillRect(x - 16, y - 8, 32, 28);
+                pvpContext.fillStyle = "#292929";
+                pvpContext.fillRect(x - 25, y - 6, 7, 26);
+                pvpContext.fillRect(x + 18, y - 6, 7, 26);
+                pvpContext.fillStyle = "#34495e";
+                pvpContext.fillRect(x - 14, y + 20, 11, 25);
+                pvpContext.fillRect(x + 3, y + 20, 11, 25);
+                pvpContext.fillStyle = "#fff";
+                pvpContext.font = "16px Arial";
+                pvpContext.textAlign = "center";
+                pvpContext.fillText("⚔", x, y - 52);
             }
 
             async function sendPvpAction(action, x, y) {
@@ -1359,6 +1414,34 @@
                     return;
                 }
                 if (x !== player.x || y !== player.y) void sendPvpAction("move", x, y);
+            });
+
+            function moveFromTouch(direction) {
+                if (!currentRoom || currentRoom.status !== "playing") return;
+                const state = currentRoom.game_state || {};
+                const users = getUsers();
+                const key = currentRoom.host_id === users[currentUsername]?.id ? "host" : "guest";
+                const player = state[key];
+                if (!player) return;
+                let x = player.x;
+                let y = player.y;
+                if (direction === "left") x -= 10;
+                if (direction === "right") x += 10;
+                if (direction === "up") y -= 10;
+                if (direction === "down") y += 10;
+                void sendPvpAction("move", x, y);
+            }
+
+            pvpControlButtons.forEach(button => {
+                button.addEventListener("click", () => moveFromTouch(button.dataset.pvpDirection));
+            });
+            pvpShootBtn.addEventListener("click", () => {
+                if (!currentRoom || currentRoom.status !== "playing") return;
+                const state = currentRoom.game_state || {};
+                const users = getUsers();
+                const key = currentRoom.host_id === users[currentUsername]?.id ? "host" : "guest";
+                const player = state[key];
+                if (player) void sendPvpAction("shoot", player.x, player.y);
             });
 
             async function renderRoom(room) {
@@ -2043,6 +2126,13 @@
             <div id="roomRound" class="hidden">
                 <h3 id="roomQuestion"></h3>
                 <canvas id="pvpCanvas" width="620" height="380"></canvas>
+                <div class="pvp-controls" aria-label="PvP controls">
+                    <span></span><button type="button" data-pvp-direction="up">▲</button><span></span>
+                    <button type="button" data-pvp-direction="left">◀</button>
+                    <button type="button" data-pvp-direction="down">▼</button>
+                    <button type="button" data-pvp-direction="right">▶</button>
+                    <button id="pvpShootBtn" type="button">SHOOT</button>
+                </div>
                 <div id="roomAnswers" class="answers"></div>
             </div>
         </div>
