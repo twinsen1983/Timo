@@ -304,6 +304,25 @@
             opacity: 0.55;
         }
 
+        #gameAnswers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+
+        #gameAnswers button {
+            padding: 0.7rem;
+            cursor: pointer;
+        }
+
+        #gameAnswers button.correct {
+            background: #8bd98b;
+        }
+
+        #gameAnswers button.wrong {
+            background: #e88a8a;
+        }
+
         .world-icon {
             display: block;
             font-size: 2rem;
@@ -325,13 +344,62 @@
         }
 
         #shopSection,
-        #clothesSection {
+        #clothesSection,
+        #gameSection {
             background: #fff;
             border-radius: 12px;
             margin: 2rem auto;
             max-width: 620px;
             padding: 1.5rem;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .game-modes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+
+        .game-mode {
+            border: 2px solid #bbb;
+            border-radius: 8px;
+            background: #f7f7f7;
+            padding: 1rem;
+            cursor: pointer;
+        }
+
+        .game-mode.active {
+            border-color: #1769aa;
+            background: #e8f4ff;
+        }
+
+        #gameFriendName {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            margin: 0.75rem 0;
+            padding: 0.7rem;
+            font: inherit;
+        }
+
+        #gameStartBtn {
+            padding: 0.7rem 1.2rem;
+            cursor: pointer;
+        }
+
+        #roomCodeInput {
+            box-sizing: border-box;
+            margin: 0.75rem 0;
+            padding: 0.7rem;
+            max-width: 180px;
+            font: inherit;
+            text-transform: uppercase;
+        }
+
+        #gameMessage {
+            min-height: 1.5rem;
+            color: #1769aa;
         }
 
         .owned-empty {
@@ -654,6 +722,17 @@
             const selectedWorldEl = document.getElementById("selectedWorld");
             const shopSection = document.getElementById("shopSection");
             const clothesSection = document.getElementById("clothesSection");
+            const gameSection = document.getElementById("gameSection");
+            const createRoomBtn = document.getElementById("createRoomBtn");
+            const joinRoomBtn = document.getElementById("joinRoomBtn");
+            const roomCodeInput = document.getElementById("roomCodeInput");
+            const roomCodeEl = document.getElementById("roomCode");
+            const startRoomBtn = document.getElementById("startRoomBtn");
+            const roomInfoEl = document.getElementById("roomInfo");
+            const roomRoundEl = document.getElementById("roomRound");
+            const roomQuestionEl = document.getElementById("roomQuestion");
+            const roomAnswersEl = document.getElementById("roomAnswers");
+            const gameMessage = document.getElementById("gameMessage");
             const avatarEl = document.getElementById("avatar");
             const shopGrid = document.getElementById("shopGrid");
             const clothesGrid = document.getElementById("clothesGrid");
@@ -675,6 +754,8 @@
             let announcementTimer;
             let pollTimer;
             let currentWorld = "math";
+            let currentRoom = null;
+            let roomChannel = null;
             const worlds = [
                 { id: "math", name: "Math Meadow", icon: "🌱", description: "Free: addition and subtraction", operations: ["+", "-"], requiredCoins: 0, requiredAnswers: 0 },
                 { id: "space", name: "Space Station", icon: "🚀", description: "15 correct + 15 coins", operations: ["*"], requiredCoins: 15, requiredAnswers: 15 },
@@ -705,6 +786,18 @@
                 if (currentUsername && users[currentUsername]) {
                     void syncCurrentProfile();
                 }
+            }
+
+            function spendCoins(amount) {
+                const users = getUsers();
+                const user = users[currentUsername];
+                if (!user || user.coins < amount) {
+                    return false;
+                }
+                user.coins -= amount;
+                saveAndSyncUsers(users);
+                updateAccountView();
+                return true;
             }
 
             function authEmail(username) {
@@ -1094,10 +1187,108 @@
                     characterSection.classList.toggle("hidden", currentView !== "clothes");
                     clothesSection.classList.toggle("hidden", currentView !== "clothes");
                     leaderboardSection.classList.toggle("hidden", currentView !== "leaderboard");
+                    gameSection.classList.toggle("hidden", currentView !== "game");
                     if (currentView === "leaderboard") {
                         updateLeaderboard();
                     }
                 });
+            });
+
+            async function refreshRoom() {
+                if (!currentRoom) {
+                    return;
+                }
+                const { data: room, error } = await supabaseClient
+                    .from("game_rooms")
+                    .select("*")
+                    .eq("id", currentRoom.id)
+                    .single();
+                if (!error) {
+                    currentRoom = room;
+                    renderRoom(room);
+                }
+            }
+
+            function subscribeToRoom(roomId) {
+                if (roomChannel) {
+                    supabaseClient.removeChannel(roomChannel);
+                }
+                roomChannel = supabaseClient
+                    .channel(`game-room-${roomId}`)
+                    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "game_rooms", filter: `id=eq.${roomId}` }, payload => {
+                        currentRoom = payload.new;
+                        renderRoom(currentRoom);
+                    })
+                    .subscribe();
+            }
+
+            function renderRoom(room) {
+                roomInfoEl.classList.remove("hidden");
+                roomCodeEl.textContent = room.code;
+                const users = getUsers();
+                const isHost = room.host_id === users[currentUsername]?.id;
+                startRoomBtn.classList.toggle("hidden", !isHost || room.status !== "waiting");
+                startRoomBtn.disabled = !room.guest_id;
+                if (room.status === "waiting") {
+                    gameMessage.textContent = room.guest_id ? "Speler gevonden. De host kan de game starten." : "Wacht op een speler met deze roomcode.";
+                    roomRoundEl.classList.add("hidden");
+                    return;
+                }
+                if (room.status === "playing" && room.question) {
+                    roomRoundEl.classList.remove("hidden");
+                    roomQuestionEl.textContent = room.question.text;
+                    roomAnswersEl.innerHTML = "";
+                    room.question.options.forEach(option => {
+                        const button = document.createElement("button");
+                        button.type = "button";
+                        button.textContent = option;
+                        button.addEventListener("click", async () => {
+                            const { error } = await supabaseClient.rpc("submit_game_answer", { p_room_id: room.id, answer_value: option });
+                            if (error) {
+                                gameMessage.textContent = error.message;
+                                return;
+                            }
+                            button.disabled = true;
+                            gameMessage.textContent = "Antwoord opgeslagen. Wacht op de andere speler.";
+                        });
+                        roomAnswersEl.appendChild(button);
+                    });
+                }
+            }
+
+            createRoomBtn.addEventListener("click", async () => {
+                const { data, error } = await supabaseClient.rpc("create_game_room");
+                if (error) {
+                    gameMessage.textContent = error.message;
+                    return;
+                }
+                const created = Array.isArray(data) ? data[0] : data;
+                currentRoom = { id: created.room_id, code: created.room_code, host_id: getUsers()[currentUsername]?.id, status: "waiting", guest_id: null };
+                await refreshCurrentProfile();
+                renderRoom(currentRoom);
+                subscribeToRoom(created.room_id);
+                gameMessage.textContent = "Room gemaakt. Deel deze code met je vriend.";
+            });
+
+            joinRoomBtn.addEventListener("click", async () => {
+                const { data, error } = await supabaseClient.rpc("join_game_room", { p_room_code: roomCodeInput.value });
+                if (error) {
+                    gameMessage.textContent = error.message;
+                    return;
+                }
+                currentRoom = Array.isArray(data) ? data[0] : data;
+                renderRoom(currentRoom);
+                subscribeToRoom(currentRoom.id);
+            });
+
+            startRoomBtn.addEventListener("click", async () => {
+                const { error } = await supabaseClient.rpc("start_game_room", {
+                    p_room_id: currentRoom.id,
+                    game_question: generateQuestion()
+                });
+                if (error) {
+                    gameMessage.textContent = error.message;
+                }
             });
 
             function isAdmin() {
@@ -1668,6 +1859,7 @@
         <button type="button" data-view="shop">Shop</button>
         <button type="button" data-view="clothes">Clothes</button>
         <button type="button" data-view="leaderboard">Top 50</button>
+        <button type="button" data-view="game">Game Corner</button>
     </nav>
     <section id="homeSection" class="page-view">
         <h2>Home</h2>
@@ -1675,6 +1867,22 @@
         <p id="selectedWorld">Selected world: Math Meadow</p>
         <div id="worldGrid" class="world-grid"></div>
         <button id="startBtn">Start exercises</button>
+    </section>
+    <section id="gameSection" class="page-view hidden">
+        <h2>Game Corner</h2>
+        <p>Een multiplayer game kost 15 coins. Maak een room en deel de code.</p>
+        <button id="createRoomBtn" type="button">Maak room (15 coins)</button>
+        <input id="roomCodeInput" type="text" maxlength="6" placeholder="Roomcode">
+        <button id="joinRoomBtn" type="button">Join room</button>
+        <p id="gameMessage"></p>
+        <div id="roomInfo" class="hidden">
+            <p>Roomcode: <strong id="roomCode"></strong></p>
+            <button id="startRoomBtn" class="hidden" type="button">Start game</button>
+            <div id="roomRound" class="hidden">
+                <h3 id="roomQuestion"></h3>
+                <div id="roomAnswers" class="answers"></div>
+            </div>
+        </div>
     </section>
     <section id="characterSection" class="hidden">
         <h2>Your character</h2>

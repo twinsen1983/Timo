@@ -23,6 +23,17 @@ create table if not exists public.game_state (
     updated_at timestamptz not null default now()
 );
 
+create table if not exists public.game_rooms (
+    id uuid primary key default gen_random_uuid(),
+    code text unique not null,
+    host_id uuid not null references auth.users(id) on delete cascade,
+    guest_id uuid references auth.users(id) on delete set null,
+    status text not null default 'waiting' check (status in ('waiting', 'playing', 'finished')),
+    question jsonb,
+    answers jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now()
+);
+
 alter table public.game_state add column if not exists poll jsonb;
 alter table public.profiles add column if not exists correct_answers integer not null default 0;
 
@@ -32,6 +43,90 @@ on conflict (id) do nothing;
 
 alter table public.profiles enable row level security;
 alter table public.game_state enable row level security;
+alter table public.game_rooms enable row level security;
+
+drop policy if exists "Room participants can read rooms" on public.game_rooms;
+create policy "Room participants can read rooms"
+on public.game_rooms for select to authenticated
+using (auth.uid() = host_id or auth.uid() = guest_id);
+
+create or replace function public.create_game_room()
+returns table(room_id uuid, room_code text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    new_code text;
+    new_id uuid;
+begin
+    if (select coins from public.profiles where id = auth.uid()) < 15 then
+        raise exception 'You need 15 coins to create a game';
+    end if;
+    loop
+        new_code := upper(substr(md5(random()::text), 1, 6));
+        exit when not exists (select 1 from public.game_rooms where code = new_code);
+    end loop;
+    update public.profiles set coins = coins - 15 where id = auth.uid();
+    insert into public.game_rooms (code, host_id) values (new_code, auth.uid()) returning id into new_id;
+    return query select new_id, new_code;
+end;
+$$;
+
+drop function if exists public.join_game_room(text);
+create or replace function public.join_game_room(p_room_code text)
+returns public.game_rooms
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare joined_room public.game_rooms;
+begin
+    update public.game_rooms
+    set guest_id = auth.uid()
+    where code = upper(trim(p_room_code)) and guest_id is null and host_id <> auth.uid()
+    returning * into joined_room;
+    if joined_room.id is null then raise exception 'Room not found or already full'; end if;
+    return joined_room;
+end;
+$$;
+
+drop function if exists public.start_game_room(uuid, jsonb);
+create or replace function public.start_game_room(p_room_id uuid, game_question jsonb)
+returns public.game_rooms
+language plpgsql security definer set search_path = public
+as $$
+declare started_room public.game_rooms;
+begin
+    update public.game_rooms
+    set status = 'playing', question = game_question, answers = '{}'::jsonb
+    where id = p_room_id and host_id = auth.uid() and guest_id is not null and status = 'waiting'
+    returning * into started_room;
+    if started_room.id is null then raise exception 'Room is not ready to start'; end if;
+    return started_room;
+end;
+$$;
+
+drop function if exists public.submit_game_answer(uuid, integer);
+create or replace function public.submit_game_answer(p_room_id uuid, answer_value integer)
+returns public.game_rooms
+language plpgsql security definer set search_path = public
+as $$
+declare answered_room public.game_rooms;
+begin
+    update public.game_rooms
+    set answers = answers || jsonb_build_object(auth.uid()::text, answer_value)
+    where id = p_room_id and (host_id = auth.uid() or guest_id = auth.uid()) and status = 'playing'
+    returning * into answered_room;
+    if answered_room.id is null then raise exception 'Game is not active'; end if;
+    return answered_room;
+end;
+$$;
+
+grant execute on function public.create_game_room() to authenticated;
+grant execute on function public.join_game_room(text) to authenticated;
+grant execute on function public.start_game_room(uuid, jsonb) to authenticated;
+grant execute on function public.submit_game_answer(uuid, integer) to authenticated;
 
 drop policy if exists "Profiles are readable by signed in users" on public.profiles;
 create policy "Profiles are readable by signed in users"
@@ -326,6 +421,9 @@ begin
     end if;
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'game_state') then
         alter publication supabase_realtime add table public.game_state;
+    end if;
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'game_rooms') then
+        alter publication supabase_realtime add table public.game_rooms;
     end if;
 end;
 $$;
