@@ -30,6 +30,7 @@ create table if not exists public.game_rooms (
     guest_id uuid references auth.users(id) on delete set null,
     status text not null default 'waiting' check (status in ('waiting', 'playing', 'finished')),
     question jsonb,
+    game_state jsonb not null default '{}'::jsonb,
     answers jsonb not null default '{}'::jsonb,
     created_at timestamptz not null default now()
 );
@@ -37,6 +38,7 @@ create table if not exists public.game_rooms (
 alter table public.game_state add column if not exists poll jsonb;
 alter table public.profiles add column if not exists correct_answers integer not null default 0;
 alter table public.game_rooms add column if not exists winner_id uuid references auth.users(id) on delete set null;
+alter table public.game_rooms add column if not exists game_state jsonb not null default '{}'::jsonb;
 
 insert into public.game_state (id)
 values (true)
@@ -100,11 +102,64 @@ as $$
 declare started_room public.game_rooms;
 begin
     update public.game_rooms
-    set status = 'playing', question = game_question, answers = '{}'::jsonb
+    set status = 'playing', question = null,
+        game_state = jsonb_build_object(
+            'host', jsonb_build_object('x', 80, 'y', 180, 'hp', 100),
+            'guest', jsonb_build_object('x', 520, 'y', 180, 'hp', 100),
+            'bullets', '[]'::jsonb
+        ), answers = '{}'::jsonb
     where id = p_room_id and host_id = auth.uid() and guest_id is not null and status = 'waiting'
     returning * into started_room;
     if started_room.id is null then raise exception 'Room is not ready to start'; end if;
     return started_room;
+end;
+$$;
+
+drop function if exists public.submit_game_action(uuid, text, integer, integer);
+create or replace function public.submit_game_action(p_room_id uuid, action text, next_x integer, next_y integer)
+returns public.game_rooms
+language plpgsql security definer set search_path = public
+as $$
+declare
+    current_room public.game_rooms;
+    player_key text;
+    other_key text;
+    state jsonb;
+    player jsonb;
+    other_player jsonb;
+    bullet jsonb;
+begin
+    select * into current_room from public.game_rooms
+    where id = p_room_id and (host_id = auth.uid() or guest_id = auth.uid()) and status = 'playing'
+    for update;
+    if current_room.id is null then raise exception 'Game is not active'; end if;
+    player_key := case when current_room.host_id = auth.uid() then 'host' else 'guest' end;
+    other_key := case when player_key = 'host' then 'guest' else 'host' end;
+    state := current_room.game_state;
+    player := state -> player_key;
+    other_player := state -> other_key;
+    if action = 'move' then
+        state := jsonb_set(state, array[player_key], jsonb_set(jsonb_set(player, '{x}', to_jsonb(greatest(20, least(580, next_x)))), '{y}', to_jsonb(greatest(20, least(340, next_y)))));
+    elsif action = 'shoot' then
+        bullet := jsonb_build_object('x', (player ->> 'x')::integer, 'y', (player ->> 'y')::integer, 'owner', player_key, 'target', other_key);
+        state := jsonb_set(state, '{bullets}', (state -> 'bullets') || jsonb_build_array(bullet));
+        if abs((player ->> 'x')::integer - (other_player ->> 'x')::integer) <= 220
+            and abs((player ->> 'y')::integer - (other_player ->> 'y')::integer) <= 120 then
+            state := jsonb_set(state, array[other_key, 'hp'], to_jsonb(greatest(0, (other_player ->> 'hp')::integer - 25)));
+            if ((other_player ->> 'hp')::integer - 25) <= 0 then
+                update public.game_rooms set status = 'finished', winner_id = auth.uid(), game_state = state where id = p_room_id returning * into current_room;
+                return current_room;
+            end if;
+        end if;
+    elsif action = 'hit' then
+        state := jsonb_set(state, array[other_key, 'hp'], to_jsonb(greatest(0, (other_player ->> 'hp')::integer - 25)));
+        if ((other_player ->> 'hp')::integer - 25) <= 0 then
+            update public.game_rooms set status = 'finished', winner_id = auth.uid(), game_state = state where id = p_room_id returning * into current_room;
+            return current_room;
+        end if;
+    end if;
+    update public.game_rooms set game_state = state where id = p_room_id returning * into current_room;
+    return current_room;
 end;
 $$;
 
@@ -147,6 +202,7 @@ grant execute on function public.create_game_room() to authenticated;
 grant execute on function public.join_game_room(text) to authenticated;
 grant execute on function public.start_game_room(uuid, jsonb) to authenticated;
 grant execute on function public.submit_game_answer(uuid, integer) to authenticated;
+grant execute on function public.submit_game_action(uuid, text, integer, integer) to authenticated;
 
 drop policy if exists "Profiles are readable by signed in users" on public.profiles;
 create policy "Profiles are readable by signed in users"

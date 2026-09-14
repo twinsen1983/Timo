@@ -451,6 +451,18 @@
             margin-bottom: 0.5rem;
         }
 
+        #pvpCanvas {
+            display: block;
+            width: 100%;
+            max-width: 620px;
+            height: auto;
+            margin: 1rem auto;
+            border: 3px solid #263238;
+            border-radius: 8px;
+            background: #87ceeb;
+            cursor: crosshair;
+        }
+
         #gameMessage {
             min-height: 1.5rem;
             color: #1769aa;
@@ -804,6 +816,8 @@
             const roomRoundEl = document.getElementById("roomRound");
             const roomQuestionEl = document.getElementById("roomQuestion");
             const roomAnswersEl = document.getElementById("roomAnswers");
+            const pvpCanvas = document.getElementById("pvpCanvas");
+            const pvpContext = pvpCanvas.getContext("2d");
             const gameMessage = document.getElementById("gameMessage");
             const avatarEl = document.getElementById("avatar");
             const shopGrid = document.getElementById("shopGrid");
@@ -828,6 +842,7 @@
             let currentWorld = "math";
             let currentRoom = null;
             let roomChannel = null;
+            let pvpKeys = new Set();
             const worlds = [
                 { id: "math", name: "Math Meadow", icon: "🌱", description: "Free: addition and subtraction", operations: ["+", "-"], requiredCoins: 0, requiredAnswers: 0 },
                 { id: "space", name: "Space Station", icon: "🚀", description: "15 correct + 15 coins", operations: ["*"], requiredCoins: 15, requiredAnswers: 15 },
@@ -1295,6 +1310,57 @@
                     .subscribe();
             }
 
+            function drawPvpArena(room) {
+                const state = room.game_state || {};
+                pvpContext.clearRect(0, 0, pvpCanvas.width, pvpCanvas.height);
+                pvpContext.fillStyle = "#7ec850";
+                pvpContext.fillRect(0, 0, pvpCanvas.width, pvpCanvas.height);
+                pvpContext.fillStyle = "#5ca339";
+                for (let x = 0; x < pvpCanvas.width; x += 40) pvpContext.fillRect(x, 0, 2, pvpCanvas.height);
+                ["host", "guest"].forEach(key => {
+                    const player = state[key];
+                    if (!player) return;
+                    pvpContext.fillStyle = key === "host" ? "#2196f3" : "#e53935";
+                    pvpContext.fillRect(player.x - 18, player.y - 18, 36, 36);
+                    pvpContext.fillStyle = "#222";
+                    pvpContext.fillRect(player.x - 18, player.y - 28, 36, 5);
+                    pvpContext.fillStyle = "#5cff5c";
+                    pvpContext.fillRect(player.x - 18, player.y - 28, 36 * (player.hp / 100), 5);
+                });
+            }
+
+            async function sendPvpAction(action, x, y) {
+                if (!currentRoom) return;
+                const { error } = await supabaseClient.rpc("submit_game_action", {
+                    p_room_id: currentRoom.id,
+                    action,
+                    next_x: Math.round(x),
+                    next_y: Math.round(y)
+                });
+                if (error) gameMessage.textContent = error.message;
+            }
+
+            document.addEventListener("keydown", event => {
+                if (!currentRoom || currentRoom.status !== "playing") return;
+                const state = currentRoom.game_state || {};
+                const users = getUsers();
+                const key = currentRoom.host_id === users[currentUsername]?.id ? "host" : "guest";
+                const player = state[key];
+                if (!player) return;
+                let x = player.x;
+                let y = player.y;
+                if (event.key.toLowerCase() === "a" || event.key === "ArrowLeft") x -= 10;
+                if (event.key.toLowerCase() === "d" || event.key === "ArrowRight") x += 10;
+                if (event.key.toLowerCase() === "w" || event.key === "ArrowUp") y -= 10;
+                if (event.key.toLowerCase() === "s" || event.key === "ArrowDown") y += 10;
+                if (event.code === "Space") {
+                    event.preventDefault();
+                    void sendPvpAction("shoot", player.x, player.y);
+                    return;
+                }
+                if (x !== player.x || y !== player.y) void sendPvpAction("move", x, y);
+            });
+
             async function renderRoom(room) {
                 roomInfoEl.classList.remove("hidden");
                 roomCodeEl.textContent = room.code;
@@ -1343,28 +1409,11 @@
                     roomRoundEl.classList.add("hidden");
                     return;
                 }
-                if (room.status === "playing" && room.question) {
+                if (room.status === "playing") {
                     roomRoundEl.classList.remove("hidden");
-                    roomQuestionEl.textContent = room.question.text;
-                    roomAnswersEl.innerHTML = "";
-                    const currentUserId = users[currentUsername]?.id;
-                    const alreadyAnswered = Boolean(currentUserId && room.answers?.[currentUserId] !== undefined);
-                    room.question.options.forEach(option => {
-                        const button = document.createElement("button");
-                        button.type = "button";
-                        button.textContent = option;
-                        button.disabled = alreadyAnswered;
-                        button.addEventListener("click", async () => {
-                            const { error } = await supabaseClient.rpc("submit_game_answer", { p_room_id: room.id, answer_value: option });
-                            if (error) {
-                                gameMessage.textContent = error.message;
-                                return;
-                            }
-                            button.disabled = true;
-                            gameMessage.textContent = "Antwoord opgeslagen. Wacht op de andere speler.";
-                        });
-                        roomAnswersEl.appendChild(button);
-                    });
+                    roomQuestionEl.textContent = "WASD / pijltjes = bewegen | Spatie = schieten";
+                    roomAnswersEl.classList.add("hidden");
+                    drawPvpArena(room);
                 }
             }
 
@@ -1993,6 +2042,7 @@
             <button id="startRoomBtn" class="hidden" type="button">Start game</button>
             <div id="roomRound" class="hidden">
                 <h3 id="roomQuestion"></h3>
+                <canvas id="pvpCanvas" width="620" height="380"></canvas>
                 <div id="roomAnswers" class="answers"></div>
             </div>
         </div>
