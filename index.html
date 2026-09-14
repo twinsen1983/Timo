@@ -383,9 +383,29 @@
             font: inherit;
         }
 
-        #gameStartBtn {
+        #gameStartBtn,
+        #createRoomBtn,
+        #startRoomBtn {
             padding: 0.7rem 1.2rem;
             cursor: pointer;
+            background: #35b853;
+            border: 2px solid #218838;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        #gameStartBtn:hover:not(:disabled),
+        #createRoomBtn:hover:not(:disabled),
+        #startRoomBtn:hover:not(:disabled) {
+            background: #2d9f47;
+        }
+
+        #gameStartBtn:disabled,
+        #createRoomBtn:disabled,
+        #startRoomBtn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
         }
 
         #roomCodeInput {
@@ -395,6 +415,40 @@
             max-width: 180px;
             font: inherit;
             text-transform: uppercase;
+        }
+
+        .room-players {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin: 1rem 0 1.5rem;
+        }
+
+        .room-player {
+            min-width: 150px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .room-avatar {
+            position: relative;
+            width: 95px;
+            height: 130px;
+            margin: 0 auto 0.5rem;
+            transform: scale(0.48);
+            transform-origin: bottom center;
+            margin-bottom: -2.5rem;
+        }
+
+        .room-player-name {
+            order: -1;
+            display: block;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+            margin-bottom: 0.5rem;
         }
 
         #gameMessage {
@@ -408,9 +462,18 @@
 
         .character-preview {
             display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
             margin: 1rem 0 1.5rem;
             perspective: 700px;
+        }
+
+        .character-name {
+            order: 1;
+            margin-top: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: bold;
         }
 
         .avatar {
@@ -581,6 +644,14 @@
             padding: 0.75rem 1.5rem;
             margin-top: 3rem;
             cursor: pointer;
+            background: #35b853;
+            border: 2px solid #218838;
+            color: #fff;
+            border-radius: 8px;
+        }
+
+        #startBtn:hover:not(:disabled) {
+            background: #2d9f47;
         }
 
         #startBtn:disabled {
@@ -729,6 +800,7 @@
             const roomCodeEl = document.getElementById("roomCode");
             const startRoomBtn = document.getElementById("startRoomBtn");
             const roomInfoEl = document.getElementById("roomInfo");
+            const roomPlayersEl = document.getElementById("roomPlayers");
             const roomRoundEl = document.getElementById("roomRound");
             const roomQuestionEl = document.getElementById("roomQuestion");
             const roomAnswersEl = document.getElementById("roomAnswers");
@@ -1036,6 +1108,7 @@
 
                 const character = ensureCharacter(user);
                 renderWorlds(user);
+                document.getElementById("characterName").textContent = currentUsername;
                 avatarEl.style.setProperty("--shirt-color", character.equipped.shirt);
                 avatarEl.style.setProperty("--hair-color", character.equipped.hair);
                 const accessoryEl = avatarEl.querySelector(".avatar-accessory");
@@ -1222,11 +1295,41 @@
                     .subscribe();
             }
 
-            function renderRoom(room) {
+            async function renderRoom(room) {
                 roomInfoEl.classList.remove("hidden");
                 roomCodeEl.textContent = room.code;
                 const users = getUsers();
                 const isHost = room.host_id === users[currentUsername]?.id;
+                const participantIds = [room.host_id, room.guest_id].filter(Boolean);
+                const { data: profiles } = await supabaseClient
+                    .from("profiles")
+                    .select("id, username, character")
+                    .in("id", participantIds);
+                roomPlayersEl.innerHTML = "";
+                (profiles || []).forEach(profile => {
+                    const character = profile.character || {};
+                    const equipped = character.equipped || {};
+                    const player = document.createElement("div");
+                    player.className = "room-player";
+                    const avatar = document.createElement("div");
+                    avatar.className = "room-avatar avatar";
+                    avatar.style.setProperty("--shirt-color", equipped.shirt || "#4caf50");
+                    avatar.style.setProperty("--hair-color", equipped.hair || "#4b2e1f");
+                    avatar.innerHTML = '<div class="avatar-hair"></div><div class="avatar-face"></div><div class="avatar-accessory"></div><div class="avatar-torso"></div><div class="avatar-arm left"></div><div class="avatar-arm right"></div><div class="avatar-leg left"></div><div class="avatar-leg right"></div>';
+                    const accessory = avatar.querySelector(".avatar-accessory");
+                    accessory.textContent = equipped.accessory || "";
+                    if (equipped.accessory === "👑") {
+                        accessory.classList.add("crown");
+                    } else if (equipped.accessory === "🕶️") {
+                        accessory.classList.add("glasses");
+                    }
+                    const name = document.createElement("span");
+                    name.className = "room-player-name";
+                    name.textContent = profile.username;
+                    player.appendChild(avatar);
+                    player.appendChild(name);
+                    roomPlayersEl.appendChild(player);
+                });
                 startRoomBtn.classList.toggle("hidden", !isHost || room.status !== "waiting");
                 startRoomBtn.disabled = !room.guest_id;
                 if (room.status === "waiting") {
@@ -1877,6 +1980,7 @@
         <p id="gameMessage"></p>
         <div id="roomInfo" class="hidden">
             <p>Roomcode: <strong id="roomCode"></strong></p>
+            <div id="roomPlayers" class="room-players"></div>
             <button id="startRoomBtn" class="hidden" type="button">Start game</button>
             <div id="roomRound" class="hidden">
                 <h3 id="roomQuestion"></h3>
@@ -1897,6 +2001,7 @@
                 <div class="avatar-leg left"></div>
                 <div class="avatar-leg right"></div>
             </div>
+            <div id="characterName" class="character-name"></div>
         </div>
     </section>
     <section id="shopSection" class="page-view hidden">
