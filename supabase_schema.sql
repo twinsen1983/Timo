@@ -85,19 +85,23 @@ security definer
 set search_path = public
 as $$
 begin
-    if not public.is_admin() or amount < 1 then
+    if not public.is_admin() or amount = 0 then
         raise exception 'Not allowed';
     end if;
 
     update public.profiles
     set coins = coins + amount
     where id = target_user;
+
+    if (select coins from public.profiles where id = target_user) < 0 then
+        raise exception 'Coins cannot go below 0';
+    end if;
 end;
 $$;
 
 grant execute on function public.add_coins(uuid, integer) to authenticated;
 
-create or replace function public.add_correct_answers(target_user uuid, amount integer)
+create or replace function public.remove_coins(target_user uuid, amount integer)
 returns void
 language plpgsql
 security definer
@@ -109,12 +113,131 @@ begin
     end if;
 
     update public.profiles
+    set coins = coins - amount
+    where id = target_user and coins >= amount;
+
+    if not found then
+        raise exception 'Not enough coins or user not found';
+    end if;
+end;
+$$;
+
+grant execute on function public.remove_coins(uuid, integer) to authenticated;
+
+create or replace function public.add_correct_answers(target_user uuid, amount integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_admin() or amount = 0 then
+        raise exception 'Not allowed';
+    end if;
+
+    update public.profiles
     set correct_answers = correct_answers + amount
     where id = target_user;
+
+    if (select correct_answers from public.profiles where id = target_user) < 0 then
+        raise exception 'Correct answers cannot go below 0';
+    end if;
 end;
 $$;
 
 grant execute on function public.add_correct_answers(uuid, integer) to authenticated;
+
+create or replace function public.remove_correct_answers(target_user uuid, amount integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_admin() or amount < 1 then
+        raise exception 'Not allowed';
+    end if;
+
+    update public.profiles
+    set correct_answers = correct_answers - amount
+    where id = target_user and correct_answers >= amount;
+
+    if not found then
+        raise exception 'Not enough correct answers or user not found';
+    end if;
+end;
+$$;
+
+grant execute on function public.remove_correct_answers(uuid, integer) to authenticated;
+
+create or replace function public.grant_item(target_user uuid, item_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    target_profile jsonb;
+    current_inventory jsonb;
+begin
+    if not public.is_admin() or item_id not in (
+        'blue-shirt', 'red-shirt', 'gold-hair', 'crown', 'brown-hair',
+        'space-shirt', 'space-helmet', 'challenge-jacket', 'challenge-crown'
+    ) then
+        raise exception 'Not allowed or invalid item';
+    end if;
+
+    select character into target_profile from public.profiles where id = target_user for update;
+    if target_profile is null then
+        raise exception 'User not found';
+    end if;
+
+    current_inventory := coalesce(target_profile -> 'inventory', '[]'::jsonb);
+    if not current_inventory ? item_id then
+        update public.profiles
+        set character = jsonb_set(
+            coalesce(character, '{}'::jsonb),
+            '{inventory}',
+            current_inventory || jsonb_build_array(item_id)
+        )
+        where id = target_user;
+    end if;
+end;
+$$;
+
+grant execute on function public.grant_item(uuid, text) to authenticated;
+
+create or replace function public.remove_item(target_user uuid, item_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    target_character jsonb;
+    new_inventory jsonb;
+begin
+    if not public.is_admin() then
+        raise exception 'Not allowed';
+    end if;
+
+    select character into target_character from public.profiles where id = target_user for update;
+    if target_character is null then
+        raise exception 'User not found';
+    end if;
+
+    new_inventory := coalesce(target_character -> 'inventory', '[]'::jsonb) - item_id;
+    update public.profiles
+    set character = jsonb_set(
+        coalesce(character, '{}'::jsonb),
+        '{inventory}',
+        new_inventory
+    )
+    where id = target_user;
+end;
+$$;
+
+grant execute on function public.remove_item(uuid, text) to authenticated;
 
 drop function if exists public.create_poll(text, text[]);
 

@@ -616,7 +616,8 @@
             const adminOverlay = document.getElementById("adminOverlay");
             const adminCloseBtn = document.getElementById("adminCloseBtn");
             const coinForm = document.getElementById("coinForm");
-            const coinUserSelect = document.getElementById("coinUser");
+            const coinUsernameInput = document.getElementById("coinUsername");
+            const coinActionSelect = document.getElementById("coinAction");
             const coinAmountInput = document.getElementById("coinAmount");
             const announcementForm = document.getElementById("announcementForm");
             const announcementInput = document.getElementById("announcementInput");
@@ -639,8 +640,14 @@
             const multiplierStatus = document.getElementById("multiplierStatus");
             const coinRain = document.getElementById("coinRain");
             const answersForm = document.getElementById("answersForm");
-            const answersUserSelect = document.getElementById("answersUser");
+            const answersUsernameInput = document.getElementById("answersUsername");
+            const answersActionSelect = document.getElementById("answersAction");
             const answersAmountInput = document.getElementById("answersAmount");
+            const itemForm = document.getElementById("itemForm");
+            const itemUsernameInput = document.getElementById("itemUsername");
+            const itemActionSelect = document.getElementById("itemAction");
+            const usernameSuggestions = document.getElementById("usernameSuggestions");
+            const itemSelect = document.getElementById("itemSelect");
             const characterSection = document.getElementById("characterSection");
             const homeSection = document.getElementById("homeSection");
             const worldGrid = document.getElementById("worldGrid");
@@ -674,11 +681,15 @@
                 { id: "challenge", name: "Challenge City", icon: "🏙️", description: "50 correct + 100 coins", operations: ["+", "-", "*"], requiredCoins: 100, requiredAnswers: 50 }
             ];
             const shopItems = [
-                { id: "blue-shirt", name: "Blue shirt", price: 5, type: "shirt", value: "#3b82f6" },
-                { id: "red-shirt", name: "Red shirt", price: 8, type: "shirt", value: "#ef4444" },
-                { id: "gold-hair", name: "Gold hair", price: 10, type: "hair", value: "#eab308" },
-                { id: "crown", name: "Crown", price: 20, type: "accessory", value: "👑" },
-                { id: "brown-hair", name: "Brown hair", price: 0, type: "hair", value: "#5e0000" },
+                { id: "blue-shirt", name: "Blue shirt", price: 5, type: "shirt", value: "#3b82f6", world: "math" },
+                { id: "red-shirt", name: "Red shirt", price: 8, type: "shirt", value: "#ef4444", world: "math" },
+                { id: "gold-hair", name: "Gold hair", price: 10, type: "hair", value: "#eab308", world: "math" },
+                { id: "crown", name: "Crown", price: 20, type: "accessory", value: "👑", world: "math" },
+                { id: "brown-hair", name: "Brown hair", price: 0, type: "hair", value: "#5e0000", world: "math" },
+                { id: "space-shirt", name: "Space shirt", price: 20, type: "shirt", value: "#7c3aed", world: "space" },
+                { id: "space-helmet", name: "Space helmet", price: 30, type: "accessory", value: "🪐", world: "space" },
+                { id: "challenge-jacket", name: "Challenge jacket", price: 40, type: "shirt", value: "#f97316", world: "challenge" },
+                { id: "challenge-crown", name: "Challenge crown", price: 60, type: "accessory", value: "👑", world: "challenge" }
             ];
 
             function getUsers() {
@@ -687,6 +698,10 @@
 
             function saveUsers(users) {
                 localStorage.setItem("mathQuizUsers", JSON.stringify(users));
+            }
+
+            function saveAndSyncUsers(users) {
+                saveUsers(users);
                 if (currentUsername && users[currentUsername]) {
                     void syncCurrentProfile();
                 }
@@ -812,7 +827,7 @@
                 const character = ensureCharacter(user);
                 const crownBonus = character.equipped.accessory === "👑" ? 2 : 1;
                 user.coins += amount * crownBonus;
-                saveUsers(users);
+                saveAndSyncUsers(users);
                 updateAccountView();
             }
 
@@ -882,12 +897,14 @@
             function renderWorlds(user) {
                 const character = ensureCharacter(user);
                 const correctAnswers = user.correct_answers || 0;
-                if (!worlds.some(world => world.id === character.world && correctAnswers >= world.requiredAnswers && user.coins >= world.requiredCoins)) {
-                    currentWorld = "math";
-                    character.world = "math";
-                } else {
-                    currentWorld = character.world;
+                const isUnlocked = worldId => {
+                    const world = worlds.find(candidate => candidate.id === worldId);
+                    return world && correctAnswers >= world.requiredAnswers && user.coins >= world.requiredCoins;
+                };
+                if (!isUnlocked(currentWorld)) {
+                    currentWorld = isUnlocked(character.world) ? character.world : "math";
                 }
+                character.world = currentWorld;
                 worldGrid.innerHTML = "";
                 worlds.forEach(world => {
                     const card = document.createElement("button");
@@ -902,7 +919,7 @@
                         }
                         currentWorld = world.id;
                         character.world = world.id;
-                        saveUsers(getUsers());
+                        saveAndSyncUsers(getUsers());
                         selectedWorldEl.textContent = `Selected world: ${world.name}`;
                         renderWorlds(user);
                     });
@@ -939,7 +956,7 @@
                 shopGrid.innerHTML = "";
                 clothesGrid.innerHTML = "";
 
-                shopItems.forEach(item => {
+                shopItems.filter(item => item.world === currentWorld).forEach(item => {
                     const itemEl = document.createElement("div");
                     itemEl.className = "shop-item";
                     const preview = document.createElement("div");
@@ -1011,7 +1028,7 @@
                 user.coins -= item.price;
                 character.inventory.push(item.id);
                 character.equipped[item.type] = item.value;
-                saveUsers(users);
+                saveAndSyncUsers(users);
                 shopMessage.textContent = `${item.name} gekocht en uitgerust.`;
                 updateAccountView();
                 updateCharacterView();
@@ -1027,7 +1044,7 @@
                 }
 
                 character.equipped[item.type] = item.value;
-                saveUsers(users);
+                saveAndSyncUsers(users);
                 shopMessage.textContent = `${item.name} uitgerust.`;
                 updateCharacterView();
             }
@@ -1047,7 +1064,7 @@
                 }
 
                 character.equipped[item.type] = defaultValues[item.type];
-                saveUsers(users);
+                saveAndSyncUsers(users);
                 shopMessage.textContent = `${item.name} unequipped.`;
                 updateCharacterView();
             }
@@ -1063,7 +1080,7 @@
                 }
 
                 character.equipped.accessory = "";
-                saveUsers(users);
+                saveAndSyncUsers(users);
                 shopMessage.textContent = "Accessoire verwijderd.";
                 updateCharacterView();
             });
@@ -1168,16 +1185,32 @@
                 if (error) {
                     throw error;
                 }
-                coinUserSelect.innerHTML = "";
-                answersUserSelect.innerHTML = "";
+                usernameSuggestions.innerHTML = "";
                 (profiles || []).forEach(profile => {
                     const option = document.createElement("option");
-                    option.value = profile.id;
-                    option.textContent = `${profile.username} (${profile.coins} coins)`;
-                    coinUserSelect.appendChild(option);
-                    const answersOption = option.cloneNode(true);
-                    answersUserSelect.appendChild(answersOption);
+                    option.value = profile.username;
+                    option.label = `${profile.coins} coins`;
+                    usernameSuggestions.appendChild(option);
                 });
+                itemSelect.innerHTML = "";
+                shopItems.forEach(item => {
+                    const option = document.createElement("option");
+                    option.value = item.id;
+                    option.textContent = `${item.name} (${item.world})`;
+                    itemSelect.appendChild(option);
+                });
+            }
+
+            async function findUserId(username) {
+                const { data: profile, error } = await supabaseClient
+                    .from("profiles")
+                    .select("id")
+                    .eq("username", username.trim())
+                    .maybeSingle();
+                if (error) {
+                    throw error;
+                }
+                return profile?.id || null;
             }
 
             async function updateLeaderboard() {
@@ -1315,15 +1348,17 @@
 
             coinForm.addEventListener("submit", async (event) => {
                 event.preventDefault();
-                const targetUser = coinUserSelect.value;
-                const amount = Number(coinAmountInput.value);
+                const targetUser = await findUserId(coinUsernameInput.value);
+                const amountValue = Number(coinAmountInput.value);
+                const isRemovingCoins = coinActionSelect.value === "remove";
+                const amount = Math.abs(amountValue);
 
-                if (!isAdmin() || !targetUser || !Number.isInteger(amount) || amount < 1) {
-                    adminMessage.textContent = "Kies een gebruiker en een geldig aantal coins.";
+                if (!isAdmin() || !targetUser || !Number.isInteger(amountValue) || amountValue < 1) {
+                    adminMessage.textContent = "Typ een bestaande naam en een aantal coins vanaf 1.";
                     return;
                 }
 
-                const { error } = await supabaseClient.rpc("add_coins", {
+                const { error } = await supabaseClient.rpc(isRemovingCoins ? "remove_coins" : "add_coins", {
                     target_user: targetUser,
                     amount
                 });
@@ -1332,7 +1367,7 @@
                     return;
                 }
                 await refreshCurrentProfile();
-                adminMessage.textContent = `${amount} coin(s) gegeven.`;
+                adminMessage.textContent = isRemovingCoins ? `${amount} coin(s) afgepakt.` : `${amount} coin(s) gegeven.`;
                 coinAmountInput.value = "1";
                 await updateCoinUsers();
                 await updateLeaderboard();
@@ -1340,13 +1375,15 @@
 
             answersForm.addEventListener("submit", async event => {
                 event.preventDefault();
-                const targetUser = answersUserSelect.value;
-                const amount = Number(answersAmountInput.value);
-                if (!isAdmin() || !targetUser || !Number.isInteger(amount) || amount < 1) {
-                    adminMessage.textContent = "Kies een gebruiker en een geldig aantal juiste antwoorden.";
+                const targetUser = await findUserId(answersUsernameInput.value);
+                const amountValue = Number(answersAmountInput.value);
+                const isRemovingAnswers = answersActionSelect.value === "remove";
+                const amount = Math.abs(amountValue);
+                if (!isAdmin() || !targetUser || !Number.isInteger(amountValue) || amountValue < 1) {
+                    adminMessage.textContent = "Typ een bestaande naam en een aantal antwoorden vanaf 1.";
                     return;
                 }
-                const { error } = await supabaseClient.rpc("add_correct_answers", {
+                const { error } = await supabaseClient.rpc(isRemovingAnswers ? "remove_correct_answers" : "add_correct_answers", {
                     target_user: targetUser,
                     amount
                 });
@@ -1354,11 +1391,30 @@
                     adminMessage.textContent = error.message;
                     return;
                 }
-                adminMessage.textContent = `${amount} juiste antwoorden gegeven.`;
+                adminMessage.textContent = isRemovingAnswers ? `${amount} juiste antwoorden afgepakt.` : `${amount} juiste antwoorden gegeven.`;
                 answersAmountInput.value = "1";
                 await refreshCurrentProfile();
                 await updateCoinUsers();
                 await updateLeaderboard();
+            });
+
+            itemForm.addEventListener("submit", async event => {
+                event.preventDefault();
+                const targetUser = await findUserId(itemUsernameInput.value);
+                const itemId = itemSelect.value;
+                if (!isAdmin() || !targetUser || !itemId) {
+                    adminMessage.textContent = "Kies een gebruiker en een voorwerp.";
+                    return;
+                }
+                const functionName = itemActionSelect.value === "remove" ? "remove_item" : "grant_item";
+                const { error } = await supabaseClient.rpc(functionName, { target_user: targetUser, item_id: itemId });
+                if (error) {
+                    adminMessage.textContent = error.message;
+                    return;
+                }
+                adminMessage.textContent = itemActionSelect.value === "remove" ? "Voorwerp verwijderd." : "Voorwerp gegeven.";
+                await refreshCurrentProfile();
+                await updateCoinUsers();
             });
 
             startCoinEventBtn.addEventListener("click", startCoinEvent);
@@ -1666,17 +1722,36 @@
             <button id="adminCloseBtn" class="closeBtn" type="button">✕</button>
             <h2>Admin panel</h2>
             <form id="coinForm">
-                <h3>Coins geven</h3>
-                <select id="coinUser" required></select>
+                <h3>Coins geven of afpakken</h3>
+                <input id="coinUsername" list="usernameSuggestions" type="text" placeholder="Typ gebruikersnaam, bijvoorbeeld C" required>
+                <select id="coinAction">
+                    <option value="give">Geef coins</option>
+                    <option value="remove">Pak coins af</option>
+                </select>
                 <input id="coinAmount" type="number" min="1" step="1" value="1" required>
                 <button type="submit">Geef coins</button>
             </form>
             <form id="answersForm">
-                <h3>Juiste antwoorden geven</h3>
-                <select id="answersUser" required></select>
-                <input id="answersAmount" type="number" min="1" step="1" value="1" required>
+                <h3>Juiste antwoorden geven of afpakken</h3>
+                <input id="answersUsername" list="usernameSuggestions" type="text" placeholder="Typ gebruikersnaam, bijvoorbeeld C" required>
+                <select id="answersAction">
+                    <option value="give">Geef juiste antwoorden</option>
+                    <option value="remove">Pak juiste antwoorden af</option>
+                </select>
+                <input id="answersAmount" type="number" step="1" value="1" required>
                 <button type="submit">Geef juiste antwoorden</button>
             </form>
+            <form id="itemForm">
+                <h3>Voorwerp geven of wegnemen</h3>
+                <input id="itemUsername" list="usernameSuggestions" type="text" placeholder="Typ gebruikersnaam, bijvoorbeeld C" required>
+                <select id="itemAction" required>
+                    <option value="give">Geef voorwerp</option>
+                    <option value="remove">Neem voorwerp weg</option>
+                </select>
+                <select id="itemSelect" required></select>
+                <button type="submit">Geef voorwerp</button>
+            </form>
+            <datalist id="usernameSuggestions"></datalist>
             <form id="announcementForm">
                 <h3>Global announcement</h3>
                 <textarea id="announcementInput" placeholder="Typ een aankondiging..." required></textarea>
