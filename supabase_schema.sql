@@ -36,6 +36,7 @@ create table if not exists public.game_rooms (
 
 alter table public.game_state add column if not exists poll jsonb;
 alter table public.profiles add column if not exists correct_answers integer not null default 0;
+alter table public.game_rooms add column if not exists winner_id uuid references auth.users(id) on delete set null;
 
 insert into public.game_state (id)
 values (true)
@@ -113,11 +114,30 @@ returns public.game_rooms
 language plpgsql security definer set search_path = public
 as $$
 declare answered_room public.game_rooms;
+    correct_answer integer;
 begin
-    update public.game_rooms
-    set answers = answers || jsonb_build_object(auth.uid()::text, answer_value)
+    select (question ->> 'answer')::integer into correct_answer
+    from public.game_rooms
     where id = p_room_id and (host_id = auth.uid() or guest_id = auth.uid()) and status = 'playing'
+    for update;
+
+    if correct_answer is null then
+        raise exception 'Game is not active';
+    end if;
+
+    update public.game_rooms
+    set answers = answers || jsonb_build_object(auth.uid()::text, answer_value),
+        status = case when answer_value = correct_answer then 'finished' else status end,
+        winner_id = case when answer_value = correct_answer then auth.uid() else winner_id end
+    where id = p_room_id
     returning * into answered_room;
+
+    if answer_value = correct_answer then
+        update public.profiles
+        set correct_answers = correct_answers + 1
+        where id = auth.uid();
+    end if;
+
     if answered_room.id is null then raise exception 'Game is not active'; end if;
     return answered_room;
 end;

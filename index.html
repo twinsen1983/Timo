@@ -1332,6 +1332,12 @@
                 });
                 startRoomBtn.classList.toggle("hidden", !isHost || room.status !== "waiting");
                 startRoomBtn.disabled = !room.guest_id;
+                if (room.status === "finished") {
+                    roomRoundEl.classList.add("hidden");
+                    const winner = (profiles || []).find(profile => profile.id === room.winner_id);
+                    gameMessage.textContent = winner ? `${winner.username} heeft gewonnen!` : "De game is afgelopen.";
+                    return;
+                }
                 if (room.status === "waiting") {
                     gameMessage.textContent = room.guest_id ? "Speler gevonden. De host kan de game starten." : "Wacht op een speler met deze roomcode.";
                     roomRoundEl.classList.add("hidden");
@@ -1341,10 +1347,13 @@
                     roomRoundEl.classList.remove("hidden");
                     roomQuestionEl.textContent = room.question.text;
                     roomAnswersEl.innerHTML = "";
+                    const currentUserId = users[currentUsername]?.id;
+                    const alreadyAnswered = Boolean(currentUserId && room.answers?.[currentUserId] !== undefined);
                     room.question.options.forEach(option => {
                         const button = document.createElement("button");
                         button.type = "button";
                         button.textContent = option;
+                        button.disabled = alreadyAnswered;
                         button.addEventListener("click", async () => {
                             const { error } = await supabaseClient.rpc("submit_game_answer", { p_room_id: room.id, answer_value: option });
                             if (error) {
