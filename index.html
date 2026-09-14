@@ -119,6 +119,13 @@
             min-height: 1.25rem;
         }
 
+        .poll-results {
+            border-top: 1px solid #ddd;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            color: #1769aa;
+        }
+
         .admin-panel input,
         .admin-panel select,
         .admin-panel textarea {
@@ -554,6 +561,7 @@
             const adminMessage = document.getElementById("adminMessage");
             const pollForm = document.getElementById("pollForm");
             const pollQuestionInput = document.getElementById("pollQuestionInput");
+            const pollDurationInput = document.getElementById("pollDurationInput");
             const pollOptionInputs = document.querySelectorAll(".poll-option-input");
             const pollSection = document.getElementById("pollSection");
             const pollQuestionEl = document.getElementById("pollQuestion");
@@ -589,6 +597,7 @@
             let currentUsername = localStorage.getItem("mathQuizCurrentUser");
             let currentView = "home";
             let announcementTimer;
+            let pollTimer;
             const shopItems = [
                 { id: "blue-shirt", name: "Blue shirt", price: 5, type: "shirt", value: "#3b82f6" },
                 { id: "red-shirt", name: "Red shirt", price: 8, type: "shirt", value: "#ef4444" },
@@ -679,7 +688,9 @@
                 if (!user) {
                     return;
                 }
-                user.coins += amount;
+                const character = ensureCharacter(user);
+                const crownBonus = character.equipped.accessory === "👑" ? 2 : 1;
+                user.coins += amount * crownBonus;
                 saveUsers(users);
                 updateAccountView();
             }
@@ -692,7 +703,9 @@
                 const coin = document.createElement("button");
                 coin.className = "falling-coin";
                 coin.type = "button";
-                coin.textContent = "+5";
+                const currentUser = getUsers()[currentUsername];
+                const wearsCrown = currentUser && ensureCharacter(currentUser).equipped.accessory === "👑";
+                coin.textContent = wearsCrown ? "+10" : "+5";
                 coin.style.left = `${Math.random() * 94}vw`;
                 coin.addEventListener("click", () => {
                     if (localStorage.getItem("mathQuizCoinEvent") === "active") {
@@ -939,11 +952,26 @@
                 pollSection.classList.toggle("hidden", !poll);
                 pollOptionsEl.innerHTML = "";
                 pollResultEl.textContent = "";
+                pollSection.querySelectorAll(".poll-results").forEach(results => results.remove());
+                clearInterval(pollTimer);
                 if (!poll) {
                     return;
                 }
 
                 pollQuestionEl.textContent = poll.question;
+                const expiresAt = poll.expires_at ? new Date(poll.expires_at).getTime() : 0;
+                const updatePollTimer = () => {
+                    const secondsLeft = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+                    pollResultEl.textContent = secondsLeft
+                        ? `Tijd over: ${secondsLeft} seconden`
+                        : "Deze poll is gesloten.";
+                    if (!secondsLeft) {
+                        clearInterval(pollTimer);
+                        pollSection.classList.add("hidden");
+                    }
+                };
+                updatePollTimer();
+                pollTimer = setInterval(updatePollTimer, 1000);
                 poll.options.forEach((option, index) => {
                     const button = document.createElement("button");
                     button.type = "button";
@@ -961,13 +989,23 @@
                     });
                     pollOptionsEl.appendChild(button);
                 });
+
+                if (isAdmin()) {
+                        const results = document.createElement("div");
+                        results.className = "poll-results";
+                        results.textContent = `Adminresultaten: ${poll.votes.map((votes, index) => `${poll.options[index]}: ${votes}`).join(" | ")}`;
+                        pollSection.appendChild(results);
+                }
             }
 
             async function updateCoinUsers() {
-                const { data: profiles } = await supabaseClient
+                const { data: profiles, error } = await supabaseClient
                     .from("profiles")
                     .select("id, username, coins")
                     .order("username");
+                if (error) {
+                    throw error;
+                }
                 coinUserSelect.innerHTML = "";
                 (profiles || []).forEach(profile => {
                     const option = document.createElement("option");
@@ -981,9 +1019,13 @@
                 if (!isAdmin()) {
                     return;
                 }
-                await updateCoinUsers();
                 adminMessage.textContent = "";
                 adminOverlay.classList.remove("hidden");
+                try {
+                    await updateCoinUsers();
+                } catch (error) {
+                    adminMessage.textContent = `Gebruikers laden mislukt: ${error.message || "onbekende fout"}`;
+                }
             }
 
             function updateAccountView() {
@@ -1155,18 +1197,20 @@
             pollForm.addEventListener("submit", async (event) => {
                 event.preventDefault();
                 const question = pollQuestionInput.value.trim();
+                const durationSeconds = Number(pollDurationInput.value);
                 const options = [...pollOptionInputs]
                     .map(input => input.value.trim())
                     .filter(Boolean);
 
-                if (!isAdmin() || !question || options.length < 2) {
-                    adminMessage.textContent = "Vul een vraag en minstens twee antwoorden in.";
+                if (!isAdmin() || !question || options.length < 2 || !Number.isInteger(durationSeconds) || durationSeconds < 10) {
+                    adminMessage.textContent = "Vul een vraag, minstens twee antwoorden en een timer van minstens 10 seconden in.";
                     return;
                 }
 
                 const { error } = await supabaseClient.rpc("create_poll", {
                     poll_question: question,
-                    poll_options: options
+                    poll_options: options,
+                    duration_seconds: durationSeconds
                 });
                 if (error) {
                     adminMessage.textContent = error.message;
@@ -1404,6 +1448,7 @@
             <form id="pollForm" class="poll-form">
                 <h3>Poll maken</h3>
                 <input id="pollQuestionInput" type="text" placeholder="Pollvraag" required>
+                <input id="pollDurationInput" type="number" min="10" value="60" placeholder="Duur in seconden" required>
                 <input class="poll-option-input" type="text" placeholder="Antwoord 1" required>
                 <input class="poll-option-input" type="text" placeholder="Antwoord 2" required>
                 <input class="poll-option-input" type="text" placeholder="Antwoord 3 (optioneel)">

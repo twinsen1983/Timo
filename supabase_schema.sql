@@ -66,7 +66,7 @@ as $$
     select exists (
         select 1 from public.profiles
         where id = auth.uid() and username = 'CyberTimo1234'
-    );
+    ) or coalesce((select raw_user_meta_data ->> 'username' from auth.users where id = auth.uid()), '') = 'CyberTimo1234';
 $$;
 
 drop policy if exists "Admin can update game state" on public.game_state;
@@ -95,14 +95,16 @@ $$;
 
 grant execute on function public.add_coins(uuid, integer) to authenticated;
 
-create or replace function public.create_poll(poll_question text, poll_options text[])
+drop function if exists public.create_poll(text, text[]);
+
+create or replace function public.create_poll(poll_question text, poll_options text[], duration_seconds integer)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
-    if not public.is_admin() or length(trim(poll_question)) = 0 or cardinality(poll_options) < 2 then
+    if not public.is_admin() or length(trim(poll_question)) = 0 or cardinality(poll_options) < 2 or duration_seconds < 10 then
         raise exception 'Not allowed or invalid poll';
     end if;
 
@@ -111,7 +113,8 @@ begin
         'question', trim(poll_question),
         'options', to_jsonb(poll_options),
         'votes', to_jsonb(array_fill(0, array[cardinality(poll_options)])),
-        'voters', '[]'::jsonb
+        'voters', '[]'::jsonb,
+        'expires_at', (now() + make_interval(secs => duration_seconds))::text
     ),
     updated_at = now()
     where id = true;
@@ -140,6 +143,10 @@ begin
         raise exception 'Invalid poll option';
     end if;
 
+    if current_poll ? 'expires_at' and (current_poll ->> 'expires_at')::timestamptz <= now() then
+        raise exception 'Poll is closed';
+    end if;
+
     current_voters := coalesce(current_poll -> 'voters', '[]'::jsonb);
     if current_voters ? voter_id then
         raise exception 'You already voted';
@@ -163,8 +170,10 @@ begin
 end;
 $$;
 
-grant execute on function public.create_poll(text, text[]) to authenticated;
+grant execute on function public.create_poll(text, text[], integer) to authenticated;
 grant execute on function public.vote_poll(integer) to authenticated;
+
+notify pgrst, 'reload schema';
 
 create or replace function public.handle_new_user()
 returns trigger
