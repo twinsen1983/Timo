@@ -2,6 +2,7 @@ create table if not exists public.profiles (
     id uuid primary key references auth.users(id) on delete cascade,
     username text unique not null,
     coins integer not null default 0 check (coins >= 0),
+    correct_answers integer not null default 0 check (correct_answers >= 0),
     character jsonb not null default jsonb_build_object(
         'inventory', '[]'::jsonb,
         'equipped', jsonb_build_object(
@@ -23,6 +24,7 @@ create table if not exists public.game_state (
 );
 
 alter table public.game_state add column if not exists poll jsonb;
+alter table public.profiles add column if not exists correct_answers integer not null default 0;
 
 insert into public.game_state (id)
 values (true)
@@ -94,6 +96,25 @@ end;
 $$;
 
 grant execute on function public.add_coins(uuid, integer) to authenticated;
+
+create or replace function public.add_correct_answers(target_user uuid, amount integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_admin() or amount < 1 then
+        raise exception 'Not allowed';
+    end if;
+
+    update public.profiles
+    set correct_answers = correct_answers + amount
+    where id = target_user;
+end;
+$$;
+
+grant execute on function public.add_correct_answers(uuid, integer) to authenticated;
 
 drop function if exists public.create_poll(text, text[]);
 
@@ -174,6 +195,17 @@ grant execute on function public.create_poll(text, text[], integer) to authentic
 grant execute on function public.vote_poll(integer) to authenticated;
 
 notify pgrst, 'reload schema';
+
+do $$
+begin
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'profiles') then
+        alter publication supabase_realtime add table public.profiles;
+    end if;
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'game_state') then
+        alter publication supabase_realtime add table public.game_state;
+    end if;
+end;
+$$;
 
 create or replace function public.handle_new_user()
 returns trigger
