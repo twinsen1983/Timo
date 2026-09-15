@@ -61,6 +61,39 @@
             text-align: right;
         }
 
+        .reward-code-panel {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #dfe8f0;
+            text-align: left;
+        }
+
+        .reward-code-panel form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .reward-code-panel input {
+            box-sizing: border-box;
+            flex: 1 1 140px;
+            padding: 0.6rem;
+            font-size: 0.95rem;
+        }
+
+        .reward-code-panel button {
+            padding: 0.6rem 0.9rem;
+            cursor: pointer;
+        }
+
+        #rewardCodeMessage {
+            min-height: 1.25rem;
+            margin-top: 0.5rem;
+            color: #1769aa;
+            font-size: 0.9rem;
+        }
+
         .coin-display {
             display: inline-flex;
             align-items: center;
@@ -832,6 +865,14 @@
             const itemActionSelect = document.getElementById("itemAction");
             const usernameSuggestions = document.getElementById("usernameSuggestions");
             const itemSelect = document.getElementById("itemSelect");
+            const rewardCodeForm = document.getElementById("rewardCodeForm");
+            const rewardCodeInput = document.getElementById("rewardCodeInput");
+            const rewardCodeMessage = document.getElementById("rewardCodeMessage");
+            const rewardCodeAdminForm = document.getElementById("rewardCodeAdminForm");
+            const rewardCodeValue = document.getElementById("rewardCodeValue");
+            const rewardCodeType = document.getElementById("rewardCodeType");
+            const rewardCodeAmount = document.getElementById("rewardCodeAmount");
+            const rewardCodeItemSelect = document.getElementById("rewardCodeItemSelect");
             const characterSection = document.getElementById("characterSection");
             const homeSection = document.getElementById("homeSection");
             const worldGrid = document.getElementById("worldGrid");
@@ -907,6 +948,65 @@
                 saveUsers(users);
                 if (currentUsername && users[currentUsername]) {
                     void syncCurrentProfile();
+                }
+            }
+
+            function getRewardCodeMap() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem("mathQuizRewardCodes") || "null");
+                    if (saved && typeof saved === "object") {
+                        return saved;
+                    }
+                } catch (error) {
+                    console.warn("Could not parse reward codes:", error);
+                }
+                const defaultCodes = {
+                    CANONBALLLLLL: { type: "coins", amount: 50, label: "50 coins" },
+                    FREE1: { type: "coins", amount: 100, label: "100 coins" },
+                    STARTERITEM: { type: "item", itemId: "blue-shirt", label: "Blue shirt" }
+                };
+                localStorage.setItem("mathQuizRewardCodes", JSON.stringify(defaultCodes));
+                return defaultCodes;
+            }
+
+            function saveRewardCodeMap(rewardCodeMap) {
+                localStorage.setItem("mathQuizRewardCodes", JSON.stringify(rewardCodeMap));
+            }
+
+            function getRewardLabel(reward) {
+                if (!reward) {
+                    return "reward";
+                }
+                if (reward.label) {
+                    return reward.label;
+                }
+                if (reward.type === "coins") {
+                    return `${reward.amount} coins`;
+                }
+                if (reward.type === "answers") {
+                    return `${reward.amount} juiste antwoorden`;
+                }
+                if (reward.type === "item") {
+                    return reward.itemId || "voorwerp";
+                }
+                return "reward";
+            }
+
+            function applyRewardToUser(user, reward) {
+                if (!user) {
+                    return;
+                }
+                const character = ensureCharacter(user);
+                if (reward.type === "coins") {
+                    user.coins = (user.coins || 0) + Number(reward.amount || 0);
+                }
+                if (reward.type === "answers") {
+                    user.correct_answers = (user.correct_answers || 0) + Number(reward.amount || 0);
+                }
+                if (reward.type === "item") {
+                    if (!character.inventory.includes(reward.itemId)) {
+                        character.inventory.push(reward.itemId);
+                    }
                 }
             }
 
@@ -1692,12 +1792,51 @@
                 accountInfo.classList.toggle("hidden", !isLoggedIn);
                 startBtn.disabled = !isLoggedIn;
                 adminOpenBtn.classList.toggle("hidden", !isAdmin());
+                const rewardCodePanel = document.getElementById("rewardCodePanel");
+                rewardCodePanel.classList.toggle("hidden", !isLoggedIn);
 
                 if (isLoggedIn) {
                     welcomeEl.textContent = `Ingelogd als ${currentUsername}`;
                     coinCountEl.textContent = user.coins;
                 }
                 updateCharacterView();
+            }
+
+            function redeemRewardCode(code) {
+                const trimmedCode = (code || "").trim().toUpperCase();
+                if (!trimmedCode) {
+                    rewardCodeMessage.textContent = "Voer een code in.";
+                    return;
+                }
+
+                const users = getUsers();
+                const user = currentUsername ? users[currentUsername] : null;
+                if (!user) {
+                    rewardCodeMessage.textContent = "Je bent niet ingelogd.";
+                    return;
+                }
+                if (!user.reward_codes) {
+                    user.reward_codes = [];
+                }
+
+                const rewardMap = getRewardCodeMap();
+                const reward = rewardMap[trimmedCode];
+                if (!reward) {
+                    rewardCodeMessage.textContent = "Deze code is ongeldig.";
+                    return;
+                }
+
+                if (user.reward_codes.includes(trimmedCode)) {
+                    rewardCodeMessage.textContent = "Deze code heb je al gebruikt.";
+                    return;
+                }
+
+                applyRewardToUser(user, reward);
+                user.reward_codes.push(trimmedCode);
+                saveAndSyncUsers(users);
+                rewardCodeForm.reset();
+                rewardCodeMessage.textContent = `Reward geclaimd: ${getRewardLabel(reward)}!`;
+                updateAccountView();
             }
 
             function setAuthMode(mode) {
@@ -1851,6 +1990,73 @@
                 await refreshCurrentProfile();
                 await updateCoinUsers();
             });
+
+            function populateRewardCodeItemOptions() {
+                rewardCodeItemSelect.innerHTML = "";
+                shopItems.forEach(item => {
+                    const option = document.createElement("option");
+                    option.value = item.id;
+                    option.textContent = `${item.name} (${item.world})`;
+                    rewardCodeItemSelect.appendChild(option);
+                });
+            }
+
+            rewardCodeForm.addEventListener("submit", event => {
+                event.preventDefault();
+                redeemRewardCode(rewardCodeInput.value);
+            });
+
+            rewardCodeAdminForm.addEventListener("submit", event => {
+                event.preventDefault();
+                if (!isAdmin()) {
+                    adminMessage.textContent = "Alleen de admin kan codes maken.";
+                    return;
+                }
+
+                const code = rewardCodeValue.value.trim().toUpperCase();
+                const rewardType = rewardCodeType.value;
+                const rewardAmount = Number(rewardCodeAmount.value || "0");
+                const itemId = rewardCodeItemSelect.value;
+                if (!code || code.length < 3) {
+                    adminMessage.textContent = "Gebruik minimaal 3 tekens voor de code.";
+                    return;
+                }
+                if (rewardType === "coins" && (!Number.isFinite(rewardAmount) || rewardAmount < 1)) {
+                    adminMessage.textContent = "Coins moeten 1 of meer zijn.";
+                    return;
+                }
+                if (rewardType === "answers" && (!Number.isFinite(rewardAmount) || rewardAmount < 1)) {
+                    adminMessage.textContent = "Juiste antwoorden moeten 1 of meer zijn.";
+                    return;
+                }
+                if (rewardType === "item" && !itemId) {
+                    adminMessage.textContent = "Kies een item voor de code.";
+                    return;
+                }
+
+                const rewardMap = getRewardCodeMap();
+                rewardMap[code] = rewardType === "item"
+                    ? { type: "item", itemId, label: `${shopItems.find(item => item.id === itemId)?.name || "item"}` }
+                    : { type: rewardType, amount: rewardAmount, label: rewardType === "coins" ? `${rewardAmount} coins` : `${rewardAmount} juiste antwoorden` };
+                saveRewardCodeMap(rewardMap);
+                adminMessage.textContent = `Reward code ${code} toegevoegd.`;
+                rewardCodeAdminForm.reset();
+                rewardCodeType.value = "coins";
+                rewardCodeType.dispatchEvent(new Event("change"));
+            });
+
+            populateRewardCodeItemOptions();
+            rewardCodeType.addEventListener("change", () => {
+                const isItemType = rewardCodeType.value === "item";
+                rewardCodeAmount.disabled = isItemType;
+                rewardCodeItemSelect.disabled = !isItemType;
+                if (isItemType) {
+                    rewardCodeAmount.value = "";
+                } else {
+                    rewardCodeAmount.value = rewardCodeAmount.value || "25";
+                }
+            });
+            rewardCodeType.dispatchEvent(new Event("change"));
 
             startCoinEventBtn.addEventListener("click", startCoinEvent);
             stopCoinEventBtn.addEventListener("click", stopCoinEvent);
@@ -2097,6 +2303,14 @@
         </div>
         <button id="logoutBtn" type="button">Uitloggen</button>
         <button id="adminOpenBtn" class="hidden" type="button">Open admin panel</button>
+        <div id="rewardCodePanel" class="reward-code-panel hidden">
+            <h3>Reward code invoeren</h3>
+            <form id="rewardCodeForm">
+                <input id="rewardCodeInput" type="text" placeholder="Bijv. TIMO50" maxlength="30" required>
+                <button type="submit">Claim reward</button>
+            </form>
+            <div id="rewardCodeMessage"></div>
+        </div>
     </section>
     <nav class="page-nav" aria-label="Main navigation">
         <button type="button" data-view="home" class="active">Home</button>
@@ -2212,6 +2426,18 @@
                 </select>
                 <select id="itemSelect" required></select>
                 <button type="submit">Geef voorwerp</button>
+            </form>
+            <form id="rewardCodeAdminForm">
+                <h3>Reward code maken</h3>
+                <input id="rewardCodeValue" type="text" placeholder="Bijv. TIMO200" maxlength="30" required>
+                <select id="rewardCodeType">
+                    <option value="coins">Coins</option>
+                    <option value="answers">Juiste antwoorden</option>
+                    <option value="item">Item</option>
+                </select>
+                <input id="rewardCodeAmount" type="number" min="1" step="1" value="25" placeholder="Bedrag">
+                <select id="rewardCodeItemSelect" required></select>
+                <button type="submit">Code opslaan</button>
             </form>
             <datalist id="usernameSuggestions"></datalist>
             <form id="announcementForm">
