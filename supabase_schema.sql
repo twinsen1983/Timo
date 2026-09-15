@@ -3,6 +3,7 @@ create table if not exists public.profiles (
     username text unique not null,
     coins integer not null default 0 check (coins >= 0),
     correct_answers integer not null default 0 check (correct_answers >= 0),
+    reward_codes jsonb not null default '[]'::jsonb,
     character jsonb not null default jsonb_build_object(
         'inventory', '[]'::jsonb,
         'equipped', jsonb_build_object(
@@ -37,6 +38,7 @@ create table if not exists public.game_rooms (
 
 alter table public.game_state add column if not exists poll jsonb;
 alter table public.profiles add column if not exists correct_answers integer not null default 0;
+alter table public.profiles add column if not exists reward_codes jsonb not null default '[]'::jsonb;
 alter table public.game_rooms add column if not exists winner_id uuid references auth.users(id) on delete set null;
 alter table public.game_rooms add column if not exists game_state jsonb not null default '{}'::jsonb;
 

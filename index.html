@@ -1014,7 +1014,13 @@
             const worlds = [
                 { id: "math", name: "Math Meadow", icon: "🌱", description: "Free: addition and subtraction", operations: ["+", "-"], requiredCoins: 0, requiredAnswers: 0 },
                 { id: "space", name: "Space Station", icon: "🚀", description: "15 correct + 15 coins", operations: ["*"], requiredCoins: 15, requiredAnswers: 15 },
-                { id: "challenge", name: "Challenge City", icon: "🏙️", description: "50 correct + 100 coins", operations: ["+", "-", "*"], requiredCoins: 100, requiredAnswers: 50 }
+                { id: "challenge", name: "Challenge City", icon: "🏙️", description: "50 correct + 100 coins", operations: ["+", "-", "*"], requiredCoins: 100, requiredAnswers: 50 },
+                { id: "ocean", name: "Ocean Reef", icon: "🌊", description: "80 correct + 150 coins", operations: ["+", "-"], requiredCoins: 150, requiredAnswers: 80 },
+                { id: "volcano", name: "Volcano Valley", icon: "🌋", description: "120 correct + 225 coins", operations: ["-", "*"], requiredCoins: 225, requiredAnswers: 120 },
+                { id: "forest", name: "Mystic Forest", icon: "🌲", description: "175 correct + 325 coins", operations: ["+", "*"], requiredCoins: 325, requiredAnswers: 175 },
+                { id: "desert", name: "Desert Ruins", icon: "🏜️", description: "240 correct + 450 coins", operations: ["+", "-", "*"], requiredCoins: 450, requiredAnswers: 240 },
+                { id: "ice", name: "Ice Kingdom", icon: "❄️", description: "325 correct + 600 coins", operations: ["-", "*"], requiredCoins: 600, requiredAnswers: 325 },
+                { id: "legend", name: "Legendary Realm", icon: "🏰", description: "425 correct + 800 coins", operations: ["+", "-", "*"], requiredCoins: 800, requiredAnswers: 425 }
             ];
             const shopItems = [
                 { id: "blue-shirt", name: "Blue shirt", price: 5, type: "shirt", value: "#3b82f6", world: "math" },
@@ -1127,7 +1133,7 @@
 
                 const { data: existingProfile, error } = await supabaseClient
                     .from("profiles")
-                    .select("id, username, coins, correct_answers, character")
+                    .select("id, username, coins, correct_answers, character, reward_codes")
                     .eq("id", user.id)
                     .maybeSingle();
                 if (error) {
@@ -1140,7 +1146,7 @@
                     const { data: createdProfile, error: createError } = await supabaseClient
                         .from("profiles")
                         .insert({ id: user.id, username })
-                        .select("id, username, coins, correct_answers, character")
+                        .select("id, username, coins, correct_answers, character, reward_codes")
                         .single();
                     if (createError) {
                         throw createError;
@@ -1168,7 +1174,8 @@
                     await supabaseClient.from("profiles").update({
                         coins: profile.coins,
                         correct_answers: profile.correct_answers || 0,
-                        character: profile.character
+                        character: profile.character,
+                        reward_codes: profile.reward_codes || []
                     }).eq("id", user.id);
                 }
             }
@@ -1181,7 +1188,7 @@
 
                 const { data: profile, error } = await supabaseClient
                     .from("profiles")
-                    .select("id, username, coins, correct_answers, character")
+                    .select("id, username, coins, correct_answers, character, reward_codes")
                     .eq("id", user.id)
                     .single();
                 if (error) {
