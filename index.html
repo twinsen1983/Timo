@@ -68,23 +68,108 @@
             text-align: left;
         }
 
+        .home-reward-box {
+            margin: 1rem auto 0;
+            max-width: 620px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid #dfe8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .home-reward-box h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+        }
+
         .reward-code-panel form {
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+            flex-direction: row;
             align-items: center;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
         }
 
         .reward-code-panel input {
             box-sizing: border-box;
             flex: 1 1 140px;
+            min-width: 0;
             padding: 0.6rem;
             font-size: 0.95rem;
         }
 
-        .reward-code-panel button {
-            padding: 0.6rem 0.9rem;
+        .reward-code-panel button,
+        .page-nav button,
+        #adminOpenBtn,
+        #logoutBtn,
+        #authSubmit,
+        #authSwitch,
+        .admin-panel button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            border-radius: 10px;
+            border: 1px solid #cfe4f5;
+            background: linear-gradient(180deg, #ffffff, #edf6ff);
+            color: #175a8d;
+            font-weight: 600;
             cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .reward-code-panel button,
+        #adminOpenBtn,
+        #logoutBtn,
+        #authSubmit,
+        .admin-panel button {
+            padding: 0.7rem 0.9rem;
+            min-height: 42px;
+        }
+
+        .reward-code-panel button::before,
+        #adminOpenBtn::before,
+        #logoutBtn::before,
+        #authSubmit::before,
+        .page-nav button::before {
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .reward-code-panel button::before {
+            content: "🎁";
+        }
+
+        #adminOpenBtn::before {
+            content: "⚙️";
+        }
+
+        #logoutBtn::before {
+            content: "🚪";
+        }
+
+        #authSubmit::before {
+            content: "🔐";
+        }
+
+        .page-nav button::before {
+            content: "🏠";
+        }
+
+        .page-nav button[data-view="shop"]::before { content: "🛍️"; }
+        .page-nav button[data-view="clothes"]::before { content: "👕"; }
+        .page-nav button[data-view="leaderboard"]::before { content: "🏆"; }
+        .page-nav button[data-view="game"]::before { content: "🎮"; }
+
+        .reward-code-panel button:hover,
+        .page-nav button:hover,
+        #adminOpenBtn:hover,
+        #logoutBtn:hover,
+        #authSubmit:hover,
+        .admin-panel button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(23, 90, 141, 0.15);
         }
 
         #rewardCodeMessage {
@@ -243,6 +328,12 @@
             margin: 0.35rem;
             padding: 0.6rem;
             cursor: pointer;
+        }
+
+        .event-controls .event-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         #coinRain {
@@ -869,6 +960,7 @@
             const rewardCodeInput = document.getElementById("rewardCodeInput");
             const rewardCodeMessage = document.getElementById("rewardCodeMessage");
             const rewardCodeAdminForm = document.getElementById("rewardCodeAdminForm");
+            const rewardCodeAdminToggle = document.getElementById("rewardCodeAdminToggle");
             const rewardCodeValue = document.getElementById("rewardCodeValue");
             const rewardCodeType = document.getElementById("rewardCodeType");
             const rewardCodeAmount = document.getElementById("rewardCodeAmount");
@@ -1146,40 +1238,100 @@
                 updateAccountView();
             }
 
-            function spawnCoin() {
-                if (localStorage.getItem("mathQuizCoinEvent") !== "active") {
+            function spawnEventReward() {
+                const mode = localStorage.getItem("mathQuizEventMode") || "none";
+                if (mode === "none" || localStorage.getItem("mathQuizCoinEvent") !== "active") {
                     return;
                 }
 
-                const coin = document.createElement("button");
-                coin.className = "falling-coin";
-                coin.type = "button";
-                const currentUser = getUsers()[currentUsername];
-                const wearsCrown = currentUser && ensureCharacter(currentUser).equipped.accessory === "👑";
-                coin.textContent = wearsCrown ? "+10" : "+5";
-                coin.style.left = `${Math.random() * 94}vw`;
-                coin.addEventListener("click", () => {
-                    if (localStorage.getItem("mathQuizCoinEvent") === "active") {
-                        addCoins(5);
-                        coin.remove();
+                const reward = document.createElement("button");
+                reward.className = "falling-coin";
+                reward.type = "button";
+                reward.style.left = `${Math.random() * 94}vw`;
+
+                if (mode === "gift") {
+                    reward.textContent = "🎁";
+                    reward.style.background = "#dfc2ff";
+                    reward.style.borderColor = "#7a56c7";
+                    reward.style.color = "#532f93";
+                } else if (mode === "double") {
+                    reward.textContent = "2x";
+                    reward.style.background = "#cfefff";
+                    reward.style.borderColor = "#2b7ec8";
+                    reward.style.color = "#0f4f7a";
+                } else {
+                    const currentUser = getUsers()[currentUsername];
+                    const wearsCrown = currentUser && ensureCharacter(currentUser).equipped.accessory === "👑";
+                    reward.textContent = wearsCrown ? "+10" : "+5";
+                }
+
+                reward.addEventListener("click", () => {
+                    if (localStorage.getItem("mathQuizCoinEvent") !== "active") {
+                        return;
                     }
+
+                    const users = getUsers();
+                    const user = currentUsername ? users[currentUsername] : null;
+                    if (!user) {
+                        reward.remove();
+                        return;
+                    }
+
+                    if (mode === "gift") {
+                        const item = shopItems[Math.floor(Math.random() * shopItems.length)];
+                        const character = ensureCharacter(user);
+                        if (!character.inventory.includes(item.id)) {
+                            character.inventory.push(item.id);
+                        }
+                        reward.textContent = "✅";
+                        reward.disabled = true;
+                        shopMessage.textContent = `Lucky drop! Je kreeg ${item.name}.`;
+                    } else if (mode === "double") {
+                        user.coins += 15;
+                        reward.textContent = "✨";
+                        reward.disabled = true;
+                        shopMessage.textContent = "Lucky boost! +15 coins.";
+                    } else {
+                        addCoins(5);
+                    }
+
+                    saveAndSyncUsers(users);
+                    updateAccountView();
+                    reward.remove();
                 });
-                coin.addEventListener("animationend", () => coin.remove());
-                coinRain.appendChild(coin);
+
+                reward.addEventListener("animationend", () => reward.remove());
+                coinRain.appendChild(reward);
             }
 
             async function startCoinEvent() {
                 await supabaseClient.from("game_state").update({ coin_event_active: true }).eq("id", true);
                 localStorage.setItem("mathQuizCoinEvent", "active");
+                localStorage.setItem("mathQuizEventMode", "coin");
                 adminMessage.textContent = "Coin rain event gestart.";
-                spawnCoin();
+                spawnEventReward();
+            }
+
+            async function startDoubleCoinsEvent() {
+                localStorage.setItem("mathQuizCoinEvent", "active");
+                localStorage.setItem("mathQuizEventMode", "double");
+                adminMessage.textContent = "Double reward event gestart.";
+                spawnEventReward();
+            }
+
+            async function startGiftDropEvent() {
+                localStorage.setItem("mathQuizCoinEvent", "active");
+                localStorage.setItem("mathQuizEventMode", "gift");
+                adminMessage.textContent = "Gift drop event gestart.";
+                spawnEventReward();
             }
 
             async function stopCoinEvent() {
                 await supabaseClient.from("game_state").update({ coin_event_active: false }).eq("id", true);
                 localStorage.setItem("mathQuizCoinEvent", "inactive");
+                localStorage.setItem("mathQuizEventMode", "none");
                 coinRain.innerHTML = "";
-                adminMessage.textContent = "Coin rain event gestopt.";
+                adminMessage.textContent = "Alle events gestopt.";
             }
 
             function ensureCharacter(user) {
@@ -2006,6 +2158,11 @@
                 redeemRewardCode(rewardCodeInput.value);
             });
 
+            rewardCodeAdminToggle.addEventListener("click", () => {
+                rewardCodeAdminForm.classList.toggle("hidden");
+                rewardCodeAdminToggle.textContent = rewardCodeAdminForm.classList.contains("hidden") ? "Code maken" : "Code maken sluiten";
+            });
+
             rewardCodeAdminForm.addEventListener("submit", event => {
                 event.preventDefault();
                 if (!isAdmin()) {
@@ -2043,9 +2200,12 @@
                 rewardCodeAdminForm.reset();
                 rewardCodeType.value = "coins";
                 rewardCodeType.dispatchEvent(new Event("change"));
+                rewardCodeAdminForm.classList.add("hidden");
+                rewardCodeAdminToggle.textContent = "Code maken";
             });
 
             populateRewardCodeItemOptions();
+            rewardCodeAdminForm.classList.add("hidden");
             rewardCodeType.addEventListener("change", () => {
                 const isItemType = rewardCodeType.value === "item";
                 rewardCodeAmount.disabled = isItemType;
@@ -2060,6 +2220,11 @@
 
             startCoinEventBtn.addEventListener("click", startCoinEvent);
             stopCoinEventBtn.addEventListener("click", stopCoinEvent);
+
+            const startDoubleCoinsBtn = document.getElementById("startDoubleCoinsBtn");
+            const startGiftDropBtn = document.getElementById("startGiftDropBtn");
+            startDoubleCoinsBtn.addEventListener("click", startDoubleCoinsEvent);
+            startGiftDropBtn.addEventListener("click", startGiftDropEvent);
 
             setMultiplierBtn.addEventListener("click", async () => {
                 if (!isAdmin()) {
@@ -2261,7 +2426,7 @@
             }
 
             showMultiplier();
-            setInterval(spawnCoin, 700);
+            setInterval(spawnEventReward, 700);
 
             void restoreSession();
         });
@@ -2303,14 +2468,6 @@
         </div>
         <button id="logoutBtn" type="button">Uitloggen</button>
         <button id="adminOpenBtn" class="hidden" type="button">Open admin panel</button>
-        <div id="rewardCodePanel" class="reward-code-panel hidden">
-            <h3>Reward code invoeren</h3>
-            <form id="rewardCodeForm">
-                <input id="rewardCodeInput" type="text" placeholder="Bijv. TIMO50" maxlength="30" required>
-                <button type="submit">Claim reward</button>
-            </form>
-            <div id="rewardCodeMessage"></div>
-        </div>
     </section>
     <nav class="page-nav" aria-label="Main navigation">
         <button type="button" data-view="home" class="active">Home</button>
@@ -2325,6 +2482,15 @@
         <p id="selectedWorld">Selected world: Math Meadow</p>
         <div id="worldGrid" class="world-grid"></div>
         <button id="startBtn">Start exercises</button>
+
+        <div id="rewardCodePanel" class="home-reward-box reward-code-panel hidden">
+            <h3>Reward code invoeren</h3>
+            <form id="rewardCodeForm">
+                <input id="rewardCodeInput" type="text" placeholder="Codes" maxlength="30" required>
+                <button type="submit" aria-label="Claim reward">Claim reward</button>
+            </form>
+            <div id="rewardCodeMessage"></div>
+        </div>
     </section>
     <section id="gameSection" class="page-view hidden">
         <h2>Game Corner</h2>
@@ -2427,7 +2593,8 @@
                 <select id="itemSelect" required></select>
                 <button type="submit">Geef voorwerp</button>
             </form>
-            <form id="rewardCodeAdminForm">
+            <button id="rewardCodeAdminToggle" type="button">Code maken</button>
+            <form id="rewardCodeAdminForm" class="hidden">
                 <h3>Reward code maken</h3>
                 <input id="rewardCodeValue" type="text" placeholder="Bijv. TIMO200" maxlength="30" required>
                 <select id="rewardCodeType">
@@ -2457,8 +2624,12 @@
             </form>
             <div class="event-controls">
                 <h3>Events</h3>
-                <button id="startCoinEventBtn" type="button">Start coin rain (+5)</button>
-                <button id="stopCoinEventBtn" type="button">Stop coin rain</button>
+                <div class="event-row">
+                    <button id="startCoinEventBtn" type="button">Coin rain</button>
+                    <button id="startDoubleCoinsBtn" type="button">Double reward</button>
+                    <button id="startGiftDropBtn" type="button">Gift drop</button>
+                    <button id="stopCoinEventBtn" type="button">Stop all</button>
+                </div>
                 <br>
                 <select id="multiplierSelect">
                     <option value="1">1x coins</option>
